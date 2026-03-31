@@ -1,0 +1,24 @@
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# n8n runtime data
+n8n/database.sqlite
+n8n/config
+n8n/crash.journal
+n8n/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Backup metadata
+clipper/.git.backup-*
