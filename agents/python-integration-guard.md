@@ -30,7 +30,7 @@ Minimal field:
 ## Integration preferences
 Urutan preferensi integrasi MVP:
 1. shared folder + manifest
-2. webhook submit manifest ke n8n
+2. webhook submit manifest ke n8nbnetar 
 3. HTTP endpoint untuk result file
 4. object storage
 

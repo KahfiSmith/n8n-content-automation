@@ -43,6 +43,7 @@ Mengambil clip/job baru yang sudah siap diproses.
 
 ### Output
 - payload kerja downstream yang sudah dinormalisasi
+- `intake_result.json` dengan status `ASSETS_VALID` atau `ASSETS_INVALID`
 
 ---
 

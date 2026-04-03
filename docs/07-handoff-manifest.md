@@ -44,3 +44,35 @@ shared/ready/
 - `clip_path` adalah shortcut ke clip pertama agar alur sederhana di n8n tetap mudah.
 - `clips` adalah daftar semua clip hasil satu job agar n8n bisa loop tanpa menebak isi folder.
 - penulisan manifest sebaiknya additive melalui helper handoff, bukan dengan mengubah logic inti clipper dulu.
+
+## File hasil intake yang direkomendasikan
+
+Setelah n8n selesai membaca dan memvalidasi `manifest.json`, workflow intake sebaiknya menulis file status terpisah:
+
+```text
+shared/ready/
+└── job_<timestamp>_<shortid>/
+    ├── manifest.json
+    └── intake_result.json
+```
+
+Tujuannya:
+- memberi penanda eksplisit bahwa job sudah pernah diproses intake
+- memudahkan tracking tanpa harus buka execution history n8n
+- menyimpan alasan valid / invalid langsung di folder job
+
+Field minimum `intake_result.json`:
+- `job_id`
+- `stage`
+- `status`
+- `checked_at`
+- `manifest_path`
+- `clip_path`
+- `validation_errors`
+
+Status yang direkomendasikan:
+- `ASSETS_VALID`
+- `ASSETS_INVALID`
+
+Contoh:
+- [examples/intake_result.example.json](/home/kahfismith/Kahfi/Project/Backend/n8n-content-automation/examples/intake_result.example.json)
