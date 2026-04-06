@@ -19,13 +19,21 @@ Menetapkan struktur folder dan kontrak file agar handoff dari Python ke n8n stab
 
 ```bash
 shared/
+├── config/
+│   ├── caption_ai.example.json
+│   └── caption_ai.json
+│   ├── youtube_oauth.example.json
+│   └── youtube_oauth.json
 ├── ready/
 │   └── job_<timestamp>_<shortid>/
 │       ├── clip_1.mp4
 │       ├── clip_2.mp4
 │       ├── transcript.txt
 │       ├── thumbnail.jpg
-│       └── manifest.json
+│       ├── manifest.json
+│       ├── intake_result.json
+│       ├── caption_result.json
+│       └── youtube_publish_result.json
 ├── published/
 └── failed/
 ```
@@ -36,6 +44,9 @@ shared/
 
 ### `ready/`
 Folder utama yang dibaca n8n. Hanya job yang sudah final dan lengkap yang boleh masuk ke sini.
+
+### `config/`
+Konfigurasi lokal yang dibaca workflow n8n. Untuk caption AI, file yang dipakai adalah `caption_ai.json`. Untuk publish YouTube, file yang dipakai adalah `youtube_oauth.json`. File-file ini sebaiknya digenerate dari `.env` dan tidak di-commit.
 
 ### `published/`
 Job yang sudah selesai publish atau disimpan untuk histori.
@@ -100,6 +111,15 @@ Contoh minimal:
 }
 ```
 
+Catatan:
+- jika `platform_targets` tidak dikirim dari UI Python, helper manifest akan mengisi default `["youtube_shorts", "tiktok", "facebook_reels"]`
+- gunakan label tetap `youtube_shorts`, `tiktok`, dan `facebook_reels`, jangan singkat jadi `fb` atau label lain yang tidak konsisten
+- `intake_result.json` dipakai sebagai marker dedupe untuk workflow intake
+- `caption_result.json` dipakai sebagai marker dedupe untuk workflow caption
+- `shared/config/caption_ai.json` dipakai sebagai sumber config lokal untuk workflow caption
+- `youtube_publish_result.json` dipakai sebagai marker dedupe untuk workflow publish YouTube
+- `shared/config/youtube_oauth.json` dipakai sebagai sumber config lokal untuk workflow publish YouTube
+
 ---
 
 ## Handoff terbaik untuk MVP
@@ -124,5 +144,5 @@ Kenapa:
 
 - Python menulis hasil final langsung ke `ready/`.
 - n8n hanya memproses job dari `ready/`.
-- setelah diproses, job bisa dipindah ke `published/` atau ditandai lewat file status.
+- setelah diproses, job bisa ditandai dulu lewat `intake_result.json`, `caption_result.json`, `youtube_publish_result.json`, lalu dipindah ke `published/` pada stage akhir.
 - jika job gagal, simpan context error di `failed/` atau incident store.

@@ -43,6 +43,7 @@ shared/ready/
 - subtitle adalah bagian dari output generator clip jika fitur subtitle diaktifkan, jadi tidak perlu field manifest terpisah kecuali nanti memang dibutuhkan.
 - `clip_path` adalah shortcut ke clip pertama agar alur sederhana di n8n tetap mudah.
 - `clips` adalah daftar semua clip hasil satu job agar n8n bisa loop tanpa menebak isi folder.
+- jika UI Python tidak mengirim `platform_targets`, helper manifest default ke `["youtube_shorts", "tiktok", "facebook_reels"]` agar konsisten dengan target publish MVP lintas platform.
 - penulisan manifest sebaiknya additive melalui helper handoff, bukan dengan mengubah logic inti clipper dulu.
 
 ## File hasil intake yang direkomendasikan
@@ -76,3 +77,83 @@ Status yang direkomendasikan:
 
 Contoh:
 - [examples/intake_result.example.json](/home/kahfismith/Kahfi/Project/Backend/n8n-content-automation/examples/intake_result.example.json)
+
+## File hasil caption yang direkomendasikan
+
+Setelah workflow caption selesai, job sebaiknya memiliki artefak status kedua:
+
+```text
+shared/ready/
+└── job_<timestamp>_<shortid>/
+    ├── manifest.json
+    ├── intake_result.json
+    └── caption_result.json
+```
+
+Tujuannya:
+- memberi penanda eksplisit bahwa caption sudah pernah digenerate
+- memudahkan dedupe workflow `WF-02 Generate Caption`
+- menyimpan output copy tanpa harus buka execution history n8n
+
+Field minimum `caption_result.json`:
+- `job_id`
+- `stage`
+- `status`
+- `generated_at`
+- `manifest_path`
+- `platform_targets`
+- `approval_mode`
+- `title`
+- `caption_pack`
+- `hashtags`
+
+Status yang direkomendasikan:
+- `CAPTION_GENERATED`
+- `CAPTION_FAILED`
+
+Catatan:
+- `caption_pack` sebaiknya berisi copy per platform, bukan satu caption generik untuk semua channel
+- status approval tetap dipisah ke `approval_result.json`, jangan dicampur ke file caption
+
+Contoh:
+- [examples/caption_result.example.json](/home/kahfismith/Kahfi/Project/Backend/n8n-content-automation/examples/caption_result.example.json)
+
+## File hasil publish YouTube yang direkomendasikan
+
+Setelah workflow publish YouTube selesai, job sebaiknya memiliki artefak status ketiga:
+
+```text
+shared/ready/
+└── job_<timestamp>_<shortid>/
+    ├── manifest.json
+    ├── intake_result.json
+    ├── caption_result.json
+    └── youtube_publish_result.json
+```
+
+Tujuannya:
+- memberi penanda eksplisit bahwa upload YouTube sudah pernah dijalankan
+- memudahkan dedupe workflow `WF-04 Publish YouTube Shorts`
+- menyimpan `video_id` dan URL hasil upload tanpa buka execution history n8n
+
+Field minimum `youtube_publish_result.json`:
+- `job_id`
+- `stage`
+- `status`
+- `published_at`
+- `manifest_path`
+- `caption_result_path`
+- `youtube_publish_result_path`
+- `clip_path`
+- `platform`
+- `privacy_status`
+- `video_id`
+- `youtube_watch_url`
+- `youtube_studio_url`
+
+Status yang direkomendasikan:
+- `YOUTUBE_UPLOADED`
+- `YOUTUBE_UPLOAD_FAILED`
+
+Contoh:
+- [examples/youtube_publish_result.example.json](/home/kahfismith/Kahfi/Project/Backend/n8n-content-automation/examples/youtube_publish_result.example.json)

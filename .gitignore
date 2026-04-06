@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+shared/config/caption_ai.json
+shared/config/youtube_oauth.json
 
 # n8n runtime data
 n8n/database.sqlite

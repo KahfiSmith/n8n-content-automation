@@ -44,9 +44,15 @@ services:
       N8N_BASIC_AUTH_ACTIVE: ${N8N_BASIC_AUTH_ACTIVE:-false}
       N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
       N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       N8N_RESTRICT_FILE_ACCESS_TO: /files;/home/node/.n8n-files
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Asia/Jakarta}
       TZ: ${TZ:-Asia/Jakarta}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_CAPTION_MODEL: ${OPENAI_CAPTION_MODEL:-gpt-5.4-mini}
+      OPENAI_CAPTION_LANGUAGE: ${OPENAI_CAPTION_LANGUAGE:-id}
+      OPENAI_CAPTION_BRAND_VOICE: ${OPENAI_CAPTION_BRAND_VOICE:-ringkas, tajam, natural, tidak clickbait murahan}
+      OPENAI_CAPTION_MAX_HASHTAGS: ${OPENAI_CAPTION_MAX_HASHTAGS:-8}
     volumes:
       - ./n8n:/home/node/.n8n
       - ./shared:/files
