@@ -1,0 +1,12 @@
+{
+  "job_id": "job_20260403_101530_ab12cd",
+  "stage": "WF-01_INTAKE",
+  "status": "ASSETS_VALID",
+  "checked_at": "2026-04-03T11:20:00+07:00",
+  "manifest_path": "shared/ready/job_20260403_101530_ab12cd/manifest.json",
+  "clip_path": "shared/ready/job_20260403_101530_ab12cd/clip_1.mp4",
+  "validation_errors": [],
+  "platform_targets": [
+    "youtube_shorts"
+  ]
+}

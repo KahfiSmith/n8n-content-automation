@@ -204,6 +204,17 @@ def run_job(job_id, payload):
             )
 
         status_text = "completed" if success == len(targets) else f"completed with {len(targets) - success} failed"
+        source_meta = {}
+        try:
+            preview = get_preview(url)
+            source_meta = {
+                "source_video_title": preview.get("title"),
+                "source_video_uploader": preview.get("uploader"),
+                "source_video_duration": preview.get("duration"),
+                "source_video_description": None,
+            }
+        except Exception:
+            source_meta = {}
         manifest = manifest_helper.write_job_manifest(
             job_dir,
             url,
@@ -214,6 +225,7 @@ def run_job(job_id, payload):
             crop_mode=crop,
             ratio=ratio,
             padding=padding,
+            **source_meta,
         )
         set_job(
             job_id,

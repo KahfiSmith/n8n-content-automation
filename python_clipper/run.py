@@ -290,6 +290,47 @@ def build_video_codec_args():
     raise RuntimeError("No supported H.264 encoder found. Install FFmpeg with libx264 or libopenh264 support.")
 
 
+def build_normalized_audio_args():
+    return [
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-ar", "48000",
+        "-ac", "2",
+        "-af", "aresample=async=1:first_pts=0",
+    ]
+
+
+def normalize_output_for_publish(output_file, event_hook=None, log_hook=None):
+    normalized_file = output_file + ".normalized.mp4"
+    cmd_normalize = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", output_file,
+        "-map", "0:v:0", "-map", "0:a:0?",
+        "-vf", "setsar=1,format=yuv420p",
+        *build_video_codec_args(),
+        *build_normalized_audio_args(),
+        "-movflags", "+faststart",
+        "-shortest",
+        normalized_file,
+    ]
+
+    if callable(event_hook):
+        try:
+            event_hook("stage", {"stage": "normalize"})
+        except Exception:
+            pass
+
+    emit_log("  Normalizing clip for publish compatibility...", log_hook=log_hook)
+    subprocess.run(
+        cmd_normalize,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    os.replace(normalized_file, output_file)
+
+
 def ambil_most_replayed(video_id):
     """
     Fetch and parse YouTube 'Most Replayed' heatmap data.
@@ -689,6 +730,12 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     pass
             os.rename(cropped_file, output_file)
 
+        normalize_output_for_publish(
+            output_file,
+            event_hook=event_hook,
+            log_hook=log_hook,
+        )
+
         emit_log("Clip successfully generated.", log_hook=log_hook)
         if callable(event_hook):
             try:
@@ -699,7 +746,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
 
     except subprocess.CalledProcessError as e:
         # Cleanup temp files
-        for f in [temp_file, cropped_file, subtitle_file]:
+        for f in [temp_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
             if os.path.exists(f):
                 try:
                     os.remove(f)
@@ -713,7 +760,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
         return False
     except Exception as e:
         # Cleanup temp files
-        for f in [temp_file, cropped_file, subtitle_file]:
+        for f in [temp_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
             if os.path.exists(f):
                 try:
                     os.remove(f)
@@ -871,6 +918,7 @@ def main():
     )
 
     if success_count > 0:
+        source_meta = manifest_helper.fetch_source_metadata(link)
         manifest = manifest_helper.write_job_manifest(
             OUTPUT_DIR,
             link,
@@ -879,6 +927,7 @@ def main():
             crop_mode=crop_mode,
             ratio=OUTPUT_RATIO,
             padding=PADDING,
+            **source_meta,
         )
         print(f"Manifest saved to '{manifest['manifest_path']}'.")
 

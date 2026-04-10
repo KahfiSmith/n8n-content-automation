@@ -1,0 +1,55 @@
+{
+  "job_id": "job_20260403_101530_ab12cd",
+  "stage": "WF-02_GENERATE_CAPTION",
+  "status": "CAPTION_GENERATED",
+  "generated_at": "2026-04-03T11:35:00+07:00",
+  "manifest_path": "shared/ready/job_20260403_101530_ab12cd/manifest.json",
+  "caption_result_path": "shared/ready/job_20260403_101530_ab12cd/caption_result.json",
+  "source_video_url": "https://youtube.com/watch?v=xxxx",
+  "source_video_id": "xxxx",
+  "platform_targets": [
+    "youtube_shorts",
+    "tiktok",
+    "facebook_reels"
+  ],
+  "approval_mode": "required",
+  "model": "gpt-5.4-mini",
+  "transcript_available": true,
+  "content_angle": "Fokus ke hambatan konsistensi upload konten dan cara menyederhanakan workflow.",
+  "hashtags": [
+    "#YouTubeShorts",
+    "#Shorts",
+    "#ContentCreator",
+    "#Workflow"
+  ],
+  "caption_pack": [
+    {
+      "platform": "youtube_shorts",
+      "caption": "Banyak creator berhenti bukan karena idenya habis, tapi karena workflow-nya ribet. Semakin sederhana alurnya, semakin mudah konsisten upload.",
+      "hashtags": [
+        "#YouTubeShorts",
+        "#Shorts",
+        "#ContentCreator"
+      ]
+    },
+    {
+      "platform": "tiktok",
+      "caption": "Masalahnya sering bukan di motivasi, tapi di proses yang terlalu panjang. Kalau workflow dipangkas, upload jadi jauh lebih konsisten.",
+      "hashtags": [
+        "#TikTokIndonesia",
+        "#ContentCreator",
+        "#Workflow"
+      ]
+    },
+    {
+      "platform": "facebook_reels",
+      "caption": "Konten bisa mandek kalau proses produksinya kebanyakan gesekan. Workflow yang rapi bikin tim lebih gampang jalan terus.",
+      "hashtags": [
+        "#FacebookReels",
+        "#ContentStrategy",
+        "#Workflow"
+      ]
+    }
+  ],
+  "next_stage": "WF-03_PUBLISH_YOUTUBE_SHORTS"
+}
