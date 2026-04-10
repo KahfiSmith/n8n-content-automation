@@ -9,7 +9,7 @@ Menyiapkan auth lokal dan workflow publish YouTube Shorts untuk MVP tanpa memind
 1. Google Cloud project
 2. YouTube Data API v3 aktif
 3. OAuth consent screen
-4. OAuth Client ID tipe Desktop App
+4. OAuth Client ID tipe Web Application
 5. Refresh token dengan scope `youtube.upload`
 
 ## Credential minimum
@@ -48,30 +48,35 @@ File ini dibaca workflow publish lewat mount Docker `/files/config/youtube_oauth
 1. Buat project di Google Cloud
 2. Enable `YouTube Data API v3`
 3. Buat `OAuth consent screen`
-4. Buat `OAuth Client ID` tipe `Desktop app`
-5. Dapatkan `refresh_token` dengan scope:
+4. Buat `OAuth Client ID` tipe `Web application`
+5. Tambahkan redirect URI:
+   - `https://developers.google.com/oauthplayground`
+6. Dapatkan `refresh_token` dengan scope:
    - `https://www.googleapis.com/auth/youtube.upload`
 
 ## Catatan penting
 
 - upload Shorts tetap memakai endpoint upload video YouTube biasa
 - video akan dianggap Shorts oleh YouTube jika formatnya memenuhi syarat Shorts
-- untuk test awal, gunakan `YOUTUBE_PRIVACY_STATUS=private`
-- `YOUTUBE_ALLOW_PUBLISH_WITHOUT_APPROVAL=true` hanya untuk MVP lokal saat `WF-03 Approval Gate` belum aktif
+- `YOUTUBE_PRIVACY_STATUS` sekarang dibaca sebagai visibility akhir yang diinginkan
+- jika nilainya `public` atau `unlisted`, workflow tetap upload awal sebagai `private`, lalu baru mengubah visibility setelah processing YouTube selesai
+- untuk test awal, tetap aman memakai `YOUTUBE_PRIVACY_STATUS=private`
+- `YOUTUBE_ALLOW_PUBLISH_WITHOUT_APPROVAL=true` hanya untuk MVP lokal saat approval gate opsional belum dipakai
 - ketika approval workflow sudah jadi, ubah nilai itu ke `false`
 
 ## Workflow yang dipakai
 
 Workflow publish YouTube sekarang bernama:
 
-- `WF-04 Publish YouTube Shorts Auto Schedule`
+- `WF-03 Publish YouTube Shorts Auto Schedule`
 
 Trigger-nya:
 
 - scan `caption_result.json`
 - hanya jalan jika status caption `CAPTION_GENERATED`
 - hanya jalan jika `platform_targets` mengandung `youtube_shorts`
-- skip jika folder job sudah punya `youtube_publish_result.json`
+- skip hanya jika folder job sudah punya `youtube_publish_result.json` dengan status `YOUTUBE_UPLOADED`
+- jika status existing masih `YOUTUBE_PROCESSING_PENDING`, workflow akan melanjutkan pengecekan processing video yang sama
 
 ## Artefak hasil
 
@@ -83,5 +88,6 @@ shared/ready/job_xxx/youtube_publish_result.json
 
 Status minimum:
 
+- `YOUTUBE_PROCESSING_PENDING`
 - `YOUTUBE_UPLOADED`
 - `YOUTUBE_UPLOAD_FAILED`

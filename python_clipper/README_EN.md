@@ -155,6 +155,7 @@ After installation, **RESTART** your terminal or VS Code for FFmpeg to be recogn
 - **Resolution**: 720x1280 (9:16 vertical)
 - **Video Codec**: libx264, CRF 26, `ultrafast` preset
 - **Audio Codec**: AAC, 128 kbps
+- **Post-process**: automatically normalized for safer YouTube uploads (`setsar=1`, AAC 48 kHz, `+faststart`)
 - **Subtitles**: Burned-in (if enabled), white text with black outline
 
 ### File Naming

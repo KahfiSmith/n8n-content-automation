@@ -119,6 +119,7 @@ Catatan:
 - `shared/config/caption_ai.json` dipakai sebagai sumber config lokal untuk workflow caption
 - `youtube_publish_result.json` dipakai sebagai marker dedupe untuk workflow publish YouTube
 - `shared/config/youtube_oauth.json` dipakai sebagai sumber config lokal untuk workflow publish YouTube
+- `WF-03` boleh membentuk title upload internal dari caption bila `caption_result.json` tidak menyimpan title
 
 ---
 

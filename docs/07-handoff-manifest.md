@@ -27,6 +27,8 @@ shared/ready/
 - `job_id`
 - `source_video_id`
 - `source_video_url`
+- `source_video_title`
+- `source_video_uploader`
 - `clip_count`
 - `clip_path`
 - `clips`
@@ -40,6 +42,7 @@ shared/ready/
 ## Catatan implementasi
 
 - `transcript_path` dan `thumbnail_path` boleh `null` jika asset belum tersedia.
+- `source_video_title`, `source_video_uploader`, `source_video_duration`, dan `source_video_description` sangat disarankan agar workflow caption tetap punya konteks saat transcript kosong.
 - subtitle adalah bagian dari output generator clip jika fitur subtitle diaktifkan, jadi tidak perlu field manifest terpisah kecuali nanti memang dibutuhkan.
 - `clip_path` adalah shortcut ke clip pertama agar alur sederhana di n8n tetap mudah.
 - `clips` adalah daftar semua clip hasil satu job agar n8n bisa loop tanpa menebak isi folder.
@@ -103,7 +106,6 @@ Field minimum `caption_result.json`:
 - `manifest_path`
 - `platform_targets`
 - `approval_mode`
-- `title`
 - `caption_pack`
 - `hashtags`
 
@@ -113,6 +115,8 @@ Status yang direkomendasikan:
 
 Catatan:
 - `caption_pack` sebaiknya berisi copy per platform, bukan satu caption generik untuk semua channel
+- output caption tidak lagi perlu menyimpan `title`, `hook_options`, `cta_options`, atau `cta` per platform
+- field minimum per item `caption_pack` sebaiknya hanya `platform`, `caption`, dan `hashtags`
 - status approval tetap dipisah ke `approval_result.json`, jangan dicampur ke file caption
 
 Contoh:
@@ -133,7 +137,7 @@ shared/ready/
 
 Tujuannya:
 - memberi penanda eksplisit bahwa upload YouTube sudah pernah dijalankan
-- memudahkan dedupe workflow `WF-04 Publish YouTube Shorts`
+- memudahkan dedupe workflow `WF-03 Publish YouTube Shorts`
 - menyimpan `video_id` dan URL hasil upload tanpa buka execution history n8n
 
 Field minimum `youtube_publish_result.json`:

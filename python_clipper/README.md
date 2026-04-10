@@ -155,6 +155,7 @@ Setelah install, **RESTART** terminal atau VS Code kamu biar FFmpeg kebaca.
 - **Resolution**: 720x1280 (9:16 vertical)
 - **Video Codec**: libx264, CRF 26, ultrafast preset
 - **Audio Codec**: AAC, 128 kbps
+- **Post-process**: otomatis dinormalisasi agar lebih aman untuk upload YouTube (`setsar=1`, AAC 48 kHz, `+faststart`)
 - **Subtitle**: Burned-in (if enabled), white text with black outline
 
 ### File Naming
