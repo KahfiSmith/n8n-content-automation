@@ -24,6 +24,8 @@ shared/
 │   └── caption_ai.json
 │   ├── youtube_oauth.example.json
 │   └── youtube_oauth.json
+│   ├── tiktok_posting.example.json
+│   └── tiktok_posting.json
 ├── ready/
 │   └── job_<timestamp>_<shortid>/
 │       ├── clip_1.mp4
@@ -46,7 +48,7 @@ shared/
 Folder utama yang dibaca n8n. Hanya job yang sudah final dan lengkap yang boleh masuk ke sini.
 
 ### `config/`
-Konfigurasi lokal yang dibaca workflow n8n. Untuk caption AI, file yang dipakai adalah `caption_ai.json`. Untuk publish YouTube, file yang dipakai adalah `youtube_oauth.json`. File-file ini sebaiknya digenerate dari `.env` dan tidak di-commit.
+Konfigurasi lokal yang dibaca workflow n8n atau helper CLI. Untuk caption AI, file yang dipakai adalah `caption_ai.json`. Untuk publish YouTube, file yang dipakai adalah `youtube_oauth.json`. Untuk TikTok helper, file yang dipakai adalah `tiktok_posting.json`. File-file ini sebaiknya digenerate dari `.env` dan tidak di-commit.
 
 ### `published/`
 Job yang sudah selesai publish atau disimpan untuk histori.
@@ -119,6 +121,7 @@ Catatan:
 - `shared/config/caption_ai.json` dipakai sebagai sumber config lokal untuk workflow caption
 - `youtube_publish_result.json` dipakai sebagai marker dedupe untuk workflow publish YouTube
 - `shared/config/youtube_oauth.json` dipakai sebagai sumber config lokal untuk workflow publish YouTube
+- `shared/config/tiktok_posting.json` dipakai sebagai sumber config lokal untuk helper TikTok
 - `WF-03` boleh membentuk title upload internal dari caption bila `caption_result.json` tidak menyimpan title
 
 ---

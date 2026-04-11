@@ -58,8 +58,8 @@ File ini dibaca workflow publish lewat mount Docker `/files/config/youtube_oauth
 
 - upload Shorts tetap memakai endpoint upload video YouTube biasa
 - video akan dianggap Shorts oleh YouTube jika formatnya memenuhi syarat Shorts
-- `YOUTUBE_PRIVACY_STATUS` sekarang dibaca sebagai visibility akhir yang diinginkan
-- jika nilainya `public` atau `unlisted`, workflow tetap upload awal sebagai `private`, lalu baru mengubah visibility setelah processing YouTube selesai
+- `YOUTUBE_PRIVACY_STATUS` sekarang dipakai langsung sebagai visibility target upload
+- jika Anda mengubah target dari `private` ke `public` atau `unlisted`, rerun `WF-03` akan mencoba mengubah video existing yang masih tertunda ke visibility baru
 - untuk test awal, tetap aman memakai `YOUTUBE_PRIVACY_STATUS=private`
 - `YOUTUBE_ALLOW_PUBLISH_WITHOUT_APPROVAL=true` hanya untuk MVP lokal saat approval gate opsional belum dipakai
 - ketika approval workflow sudah jadi, ubah nilai itu ke `false`
@@ -76,7 +76,7 @@ Trigger-nya:
 - hanya jalan jika status caption `CAPTION_GENERATED`
 - hanya jalan jika `platform_targets` mengandung `youtube_shorts`
 - skip hanya jika folder job sudah punya `youtube_publish_result.json` dengan status `YOUTUBE_UPLOADED`
-- jika status existing masih `YOUTUBE_PROCESSING_PENDING`, workflow akan melanjutkan pengecekan processing video yang sama
+- jika status existing masih `YOUTUBE_PROCESSING_PENDING`, workflow akan melanjutkan pengecekan processing video yang sama dan mencoba menyamakan visibility dengan target terbaru
 
 ## Artefak hasil
 
@@ -91,3 +91,9 @@ Status minimum:
 - `YOUTUBE_PROCESSING_PENDING`
 - `YOUTUBE_UPLOADED`
 - `YOUTUBE_UPLOAD_FAILED`
+
+Field bantu debugging yang penting:
+
+- `status_checked_at` untuk melihat kapan poll status terakhir dijalankan
+- `publish_mode` untuk membedakan `new_upload`, `reconcile_existing_video`, atau hasil reconcile dari pencarian channel
+- `processing_status_source` untuk melihat apakah status final diambil dari `processingDetails.processingStatus` atau fallback `status.uploadStatus`

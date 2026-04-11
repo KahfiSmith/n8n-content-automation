@@ -79,6 +79,9 @@ Menghasilkan caption dan hashtag yang relevan dengan isi clip tanpa output templ
 ### Output
 - `caption_result.json`
 - `caption_pack`
+- `clip_caption_pack`
+- `upload_queue_tiktok.csv`
+- `upload_queue_youtube_shorts.csv`
 - `hashtags`
 - `content_angle`
 
@@ -93,7 +96,11 @@ Menghasilkan caption dan hashtag yang relevan dengan isi clip tanpa output templ
 
 ### Catatan kontrak
 - output caption tidak lagi menyimpan `title`, `hook_options`, atau `cta_options`
-- `caption_pack` hanya perlu menyimpan `platform`, `caption`, dan `hashtags`
+- `caption_pack` adalah fallback global per platform dan tetap menyimpan `platform`, `caption`, dan `hashtags`
+- `clip_caption_pack` adalah sumber utama untuk upload queue; jumlah item harus sama dengan jumlah `manifest.clips`
+- setiap item `clip_caption_pack` harus menyimpan `clip_id`, `clip_index`, `file_name`, `clip_path`, dan `captions[]` per platform
+- `WF-02` otomatis menulis CSV upload manual untuk `tiktok` dan `youtube_shorts` setelah `caption_result.json` berhasil dibuat
+- untuk kebutuhan queue manual, `WF-02` selalu meminta caption `youtube_shorts` dan `tiktok` walau `manifest.platform_targets` lama hanya berisi salah satunya
 - workflow publish `WF-03` boleh menurunkan title upload secara internal dari caption jika platform membutuhkannya
 - jika `transcript_path` kosong, `WF-02` sebaiknya tetap memakai `source_video_title`, `source_video_uploader`, dan deskripsi sumber dari `manifest.json` agar caption tidak jatuh ke fallback generik
 - `next_stage` default untuk MVP lokal sekarang adalah `WF-03_PUBLISH_YOUTUBE_SHORTS`
@@ -139,6 +146,8 @@ Workflow ini hanya jalan jika `platform_targets` mengandung `youtube_shorts`.
 - `youtube_watch_url`
 - `youtube_studio_url`
 - `privacy_status`
+- `status_checked_at` untuk tahu kapan polling terakhir dilakukan
+- `publish_mode` untuk membedakan upload baru vs recheck video existing
 
 ### Status hasil
 - `YOUTUBE_PROCESSING_PENDING`
@@ -146,8 +155,11 @@ Workflow ini hanya jalan jika `platform_targets` mengandung `youtube_shorts`.
 - `YOUTUBE_UPLOAD_FAILED`
 
 ### Catatan visibility
-- jika target visibility akhir adalah `public` atau `unlisted`, workflow tetap upload awal sebagai `private`
-- setelah YouTube selesai processing, workflow akan mencoba mengubah visibility ke target akhir
+- `YOUTUBE_PRIVACY_STATUS` sekarang dipakai langsung sebagai target visibility upload
+- jika video lama sudah terlanjur `private` tapi target sekarang `public` atau `unlisted`, rerun `WF-03` akan mencoba mengubah visibility video yang sama lebih awal
+- status `YOUTUBE_PROCESSING_PENDING` tetap bisa muncul jika YouTube masih memproses video, tetapi visibility target tidak lagi sengaja ditahan private oleh workflow
+- jika `processingDetails.processingStatus` tidak ada, workflow akan fallback ke `status.uploadStatus`; nilai `processed` dipetakan sebagai final sukses agar status tidak nyangkut `pending` hanya karena beda field API
+- untuk debugging lokal, bandingkan `published_at` dengan `status_checked_at`; kalau `published_at` lama tapi `status_checked_at` baru, artinya workflow sedang recheck video existing, bukan upload ulang
 
 ---
 
@@ -167,6 +179,16 @@ Status yang relevan untuk approval tetap:
 ## Future: Publish TikTok
 
 Pisahkan workflow TikTok dari YouTube dan aktifkan hanya jika target platform memang sudah siap.
+
+Untuk sekarang, TikTok disiapkan dulu lewat helper CLI:
+
+- `python3 scripts/write_tiktok_config.py`
+- `python3 scripts/tiktok_oauth.py auth-url --redirect-uri ...`
+- `python3 scripts/tiktok_oauth.py exchange-code --code ... --redirect-uri ...`
+- `python3 scripts/tiktok_content_post.py creator-info`
+- `python3 scripts/tiktok_content_post.py post-job --job-dir shared/ready/<job_id> --post-mode UPLOAD`
+
+Jadi belum ada workflow aktif bernomor baru. Ini sengaja supaya alur 1-2-3 yang sudah stabil tidak tercampur integrasi platform yang masih tahap setup.
 
 ---
 

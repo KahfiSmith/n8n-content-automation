@@ -4,6 +4,7 @@
 !.env.example
 shared/config/caption_ai.json
 shared/config/youtube_oauth.json
+shared/config/tiktok_posting.json
 
 # n8n runtime data
 n8n/database.sqlite
