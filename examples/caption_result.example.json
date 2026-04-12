@@ -15,6 +15,23 @@
   "approval_mode": "required",
   "model": "gpt-5.4-mini",
   "transcript_available": true,
+  "clip_count": 2,
+  "clips": [
+    {
+      "clip_index": 1,
+      "clip_id": "clip_01",
+      "file_name": "clip_1.mp4",
+      "clip_path": "shared/ready/job_20260403_101530_ab12cd/clip_1.mp4",
+      "clip_path_abs": "/files/ready/job_20260403_101530_ab12cd/clip_1.mp4"
+    },
+    {
+      "clip_index": 2,
+      "clip_id": "clip_02",
+      "file_name": "clip_2.mp4",
+      "clip_path": "shared/ready/job_20260403_101530_ab12cd/clip_2.mp4",
+      "clip_path_abs": "/files/ready/job_20260403_101530_ab12cd/clip_2.mp4"
+    }
+  ],
   "content_angle": "Fokus ke hambatan konsistensi upload konten dan cara menyederhanakan workflow.",
   "hashtags": [
     "#YouTubeShorts",
@@ -51,5 +68,78 @@
       ]
     }
   ],
+  "clip_caption_pack": [
+    {
+      "clip_id": "clip_01",
+      "clip_index": 1,
+      "file_name": "clip_1.mp4",
+      "clip_path": "shared/ready/job_20260403_101530_ab12cd/clip_1.mp4",
+      "captions": [
+        {
+          "platform": "youtube_shorts",
+          "caption": "Workflow konten yang terlalu panjang sering bikin konsistensi runtuh sebelum ide habis.",
+          "hashtags": [
+            "#YouTubeShorts",
+            "#ContentCreator",
+            "#Workflow"
+          ]
+        },
+        {
+          "platform": "tiktok",
+          "caption": "Kalau proses upload terlalu ribet, konsistensi biasanya kalah duluan.",
+          "hashtags": [
+            "#TikTokIndonesia",
+            "#ContentCreator",
+            "#Workflow"
+          ]
+        },
+        {
+          "platform": "facebook_reels",
+          "caption": "Workflow yang kepanjangan bikin konten bagus sering berhenti sebelum sempat dipublish.",
+          "hashtags": [
+            "#FacebookReels",
+            "#ContentCreator",
+            "#Workflow"
+          ]
+        }
+      ]
+    },
+    {
+      "clip_id": "clip_02",
+      "clip_index": 2,
+      "file_name": "clip_2.mp4",
+      "clip_path": "shared/ready/job_20260403_101530_ab12cd/clip_2.mp4",
+      "captions": [
+        {
+          "platform": "youtube_shorts",
+          "caption": "Sederhanakan alur produksi, lalu konsistensi upload jadi jauh lebih realistis.",
+          "hashtags": [
+            "#YouTubeShorts",
+            "#ContentStrategy",
+            "#Workflow"
+          ]
+        },
+        {
+          "platform": "tiktok",
+          "caption": "Bukan cuma soal semangat. Workflow yang pendek bikin upload lebih gampang kejaga.",
+          "hashtags": [
+            "#TikTokIndonesia",
+            "#ContentStrategy",
+            "#Workflow"
+          ]
+        },
+        {
+          "platform": "facebook_reels",
+          "caption": "Produksi konten lebih realistis kalau alurnya dibuat pendek dan jelas.",
+          "hashtags": [
+            "#FacebookReels",
+            "#ContentStrategy",
+            "#Workflow"
+          ]
+        }
+      ]
+    }
+  ],
+  "caption_warnings": [],
   "next_stage": "WF-03_PUBLISH_YOUTUBE_SHORTS"
 }
