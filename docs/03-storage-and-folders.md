@@ -35,7 +35,8 @@ shared/
 │       ├── manifest.json
 │       ├── intake_result.json
 │       ├── caption_result.json
-│       └── youtube_publish_result.json
+│       ├── youtube_publish_result_clip_01.json
+│       └── youtube_publish_result_clip_02.json
 ├── published/
 └── failed/
 ```
@@ -119,7 +120,7 @@ Catatan:
 - `intake_result.json` dipakai sebagai marker dedupe untuk workflow intake
 - `caption_result.json` dipakai sebagai marker dedupe untuk workflow caption
 - `shared/config/caption_ai.json` dipakai sebagai sumber config lokal untuk workflow caption
-- `youtube_publish_result.json` dipakai sebagai marker dedupe untuk workflow publish YouTube
+- `youtube_publish_result_clip_*.json` dipakai sebagai marker dedupe per clip untuk workflow publish YouTube
 - `shared/config/youtube_oauth.json` dipakai sebagai sumber config lokal untuk workflow publish YouTube
 - `shared/config/tiktok_posting.json` dipakai sebagai sumber config lokal untuk helper TikTok
 - `WF-03` boleh membentuk title upload internal dari caption bila `caption_result.json` tidak menyimpan title
@@ -148,5 +149,5 @@ Kenapa:
 
 - Python menulis hasil final langsung ke `ready/`.
 - n8n hanya memproses job dari `ready/`.
-- setelah diproses, job bisa ditandai dulu lewat `intake_result.json`, `caption_result.json`, `youtube_publish_result.json`, lalu dipindah ke `published/` pada stage akhir.
+- setelah diproses, job bisa ditandai dulu lewat `intake_result.json`, `caption_result.json`, dan `youtube_publish_result_clip_*.json`, lalu dipindah ke `published/` pada stage akhir.
 - jika job gagal, simpan context error di `failed/` atau incident store.

@@ -48,6 +48,7 @@ Folder aplikasi clipper manual yang sudah ada. Semua logic Python utama tetap be
 Catatan:
 - hasil generate sekarang diarahkan ke `shared/ready/`
 - web UI tetap berjalan, hanya lokasi penyimpanan final clip yang dipindahkan ke area handoff
+- durasi final clip sekarang ditargetkan minimal 45 detik dan maksimal 60 detik jika source video memungkinkan, agar tetap aman untuk YouTube Shorts publish
 
 ### `shared/`
 Area handoff antar Python dan automation.

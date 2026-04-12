@@ -115,6 +115,7 @@ Menghasilkan caption dan hashtag yang relevan dengan isi clip tanpa output templ
 - description/caption
 - tags/hashtags
 - privacy/schedule
+- satu item publish per `manifest.clips[]`
 
 ### Output
 - youtube status
@@ -141,9 +142,10 @@ Workflow ini hanya jalan jika `platform_targets` mengandung `youtube_shorts`.
 - jika status existing masih `YOUTUBE_PROCESSING_PENDING`, workflow harus lanjut polling status video yang sama, bukan upload ulang
 
 ### Output
-- `youtube_publish_result.json`
+- `youtube_publish_result_clip_01.json` dst. untuk job multi-clip
 - `video_id`
 - `youtube_watch_url`
+- `youtube_shorts_url`
 - `youtube_studio_url`
 - `privacy_status`
 - `status_checked_at` untuk tahu kapan polling terakhir dilakukan
@@ -160,6 +162,7 @@ Workflow ini hanya jalan jika `platform_targets` mengandung `youtube_shorts`.
 - status `YOUTUBE_PROCESSING_PENDING` tetap bisa muncul jika YouTube masih memproses video, tetapi visibility target tidak lagi sengaja ditahan private oleh workflow
 - jika `processingDetails.processingStatus` tidak ada, workflow akan fallback ke `status.uploadStatus`; nilai `processed` dipetakan sebagai final sukses agar status tidak nyangkut `pending` hanya karena beda field API
 - untuk debugging lokal, bandingkan `published_at` dengan `status_checked_at`; kalau `published_at` lama tapi `status_checked_at` baru, artinya workflow sedang recheck video existing, bukan upload ulang
+- karena workflow sekarang menulis result per clip, rerun publish akan memakai file `youtube_publish_result_clip_*.json` sebagai checkpoint agar tidak upload ulang clip yang sama
 
 ---
 

@@ -17,7 +17,7 @@ Untuk satu job di `shared/ready/<job_id>/`, artefak yang dipakai dedupe adalah:
 
 - `intake_result.json`
 - `caption_result.json`
-- `youtube_publish_result.json`
+- `youtube_publish_result_clip_*.json`
 
 ## Rerun paling aman untuk job yang sama
 
@@ -27,7 +27,7 @@ Hapus:
 
 - `intake_result.json`
 - `caption_result.json`
-- `youtube_publish_result.json`
+- `youtube_publish_result_clip_*.json`
 
 Biarkan:
 
@@ -46,7 +46,7 @@ Lalu run urut:
 Hapus:
 
 - `caption_result.json`
-- `youtube_publish_result.json`
+- `youtube_publish_result_clip_*.json`
 
 Lalu run:
 
@@ -57,7 +57,7 @@ Lalu run:
 
 Hapus:
 
-- `youtube_publish_result.json`
+- `youtube_publish_result_clip_*.json`
 
 Lalu run:
 
@@ -85,7 +85,7 @@ Lalu run:
 
 ### Publish YouTube
 
-- file `youtube_publish_result.json` ada
+- file `youtube_publish_result_clip_*.json` ada
 - status `YOUTUBE_UPLOADED` untuk final selesai
 - status `YOUTUBE_PROCESSING_PENDING` masih valid untuk upload yang sudah diterima tapi masih diproses YouTube
 
@@ -99,5 +99,6 @@ Lalu run:
 
 - upload sukses tidak selalu berarti video langsung `processed`
 - cek `processingStatus` di YouTube Studio atau API jika visibility terasa tertunda
-- cek `status_checked_at` di `youtube_publish_result.json` untuk memastikan workflow masih melakukan polling status terbaru
+- cek `status_checked_at` di `youtube_publish_result_clip_*.json` untuk memastikan workflow masih melakukan polling status terbaru
 - kalau `publish_mode` bernilai `reconcile_existing_video`, workflow sedang mengecek video yang sama lagi, bukan upload ulang clip baru
+- kalau hasil checker menunjukkan `uploadLimitExceeded`, hentikan rerun dulu karena YouTube sedang menolak upload tambahan dari channel itu

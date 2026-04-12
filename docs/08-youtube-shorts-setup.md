@@ -20,7 +20,7 @@ Isi `.env` dengan field ini:
 YOUTUBE_CLIENT_ID=
 YOUTUBE_CLIENT_SECRET=
 YOUTUBE_REFRESH_TOKEN=
-YOUTUBE_PRIVACY_STATUS=private
+YOUTUBE_PRIVACY_STATUS=public
 YOUTUBE_CATEGORY_ID=22
 YOUTUBE_NOTIFY_SUBSCRIBERS=false
 YOUTUBE_SELF_DECLARED_MADE_FOR_KIDS=false
@@ -58,9 +58,9 @@ File ini dibaca workflow publish lewat mount Docker `/files/config/youtube_oauth
 
 - upload Shorts tetap memakai endpoint upload video YouTube biasa
 - video akan dianggap Shorts oleh YouTube jika formatnya memenuhi syarat Shorts
+- clipper Python sekarang menargetkan final durasi 45-60 detik per clip jika source video memungkinkan, supaya lebih aman untuk YouTube Shorts
 - `YOUTUBE_PRIVACY_STATUS` sekarang dipakai langsung sebagai visibility target upload
 - jika Anda mengubah target dari `private` ke `public` atau `unlisted`, rerun `WF-03` akan mencoba mengubah video existing yang masih tertunda ke visibility baru
-- untuk test awal, tetap aman memakai `YOUTUBE_PRIVACY_STATUS=private`
 - `YOUTUBE_ALLOW_PUBLISH_WITHOUT_APPROVAL=true` hanya untuk MVP lokal saat approval gate opsional belum dipakai
 - ketika approval workflow sudah jadi, ubah nilai itu ke `false`
 
@@ -75,15 +75,18 @@ Trigger-nya:
 - scan `caption_result.json`
 - hanya jalan jika status caption `CAPTION_GENERATED`
 - hanya jalan jika `platform_targets` mengandung `youtube_shorts`
-- skip hanya jika folder job sudah punya `youtube_publish_result.json` dengan status `YOUTUBE_UPLOADED`
-- jika status existing masih `YOUTUBE_PROCESSING_PENDING`, workflow akan melanjutkan pengecekan processing video yang sama dan mencoba menyamakan visibility dengan target terbaru
+- expand `manifest.clips[]` menjadi satu publish item per clip
+- memakai file `youtube_publish_result_clip_*.json` per clip sebagai checkpoint dedupe
+- jika status existing masih `YOUTUBE_PROCESSING_PENDING`, workflow akan melanjutkan pengecekan processing video yang sama dan mencoba menyamakan visibility dengan target terbaru, bukan upload ulang clip baru
 
 ## Artefak hasil
 
 Jika upload berhasil:
 
 ```text
-shared/ready/job_xxx/youtube_publish_result.json
+shared/ready/job_xxx/youtube_publish_result_clip_01.json
+shared/ready/job_xxx/youtube_publish_result_clip_02.json
+...
 ```
 
 Status minimum:
@@ -97,3 +100,21 @@ Field bantu debugging yang penting:
 - `status_checked_at` untuk melihat kapan poll status terakhir dijalankan
 - `publish_mode` untuk membedakan `new_upload`, `reconcile_existing_video`, atau hasil reconcile dari pencarian channel
 - `processing_status_source` untuk melihat apakah status final diambil dari `processingDetails.processingStatus` atau fallback `status.uploadStatus`
+- `youtube_shorts_url` untuk buka clip langsung di player Shorts
+
+## Cek processing tanpa buka Studio terus-menerus
+
+Untuk cek status per clip dari terminal, pakai helper ini:
+
+```bash
+docker compose cp scripts/check_youtube_processing.js n8n:/tmp/check_youtube_processing.js
+docker compose exec n8n node /tmp/check_youtube_processing.js --config /files/config/youtube_oauth.json --job-dir /files/ready/<job_id>
+```
+
+Jika output masih menunjukkan:
+
+```text
+PROCESSING_NO_DURATION ... upload=uploaded processing=processing duration=P0D
+```
+
+setelah 30-60 menit, kemungkinan video stuck di sisi YouTube dan perlu dihapus lalu di-upload ulang setelah limit/channel sudah normal.

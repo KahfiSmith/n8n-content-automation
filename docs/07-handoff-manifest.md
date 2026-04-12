@@ -132,15 +132,16 @@ shared/ready/
     ├── manifest.json
     ├── intake_result.json
     ├── caption_result.json
-    └── youtube_publish_result.json
+    ├── youtube_publish_result_clip_01.json
+    └── youtube_publish_result_clip_02.json
 ```
 
 Tujuannya:
 - memberi penanda eksplisit bahwa upload YouTube sudah pernah dijalankan
-- memudahkan dedupe workflow `WF-03 Publish YouTube Shorts`
+- memudahkan dedupe workflow `WF-03 Publish YouTube Shorts` per clip
 - menyimpan `video_id` dan URL hasil upload tanpa buka execution history n8n
 
-Field minimum `youtube_publish_result.json`:
+Field minimum `youtube_publish_result_clip_XX.json`:
 - `job_id`
 - `stage`
 - `status`
@@ -149,10 +150,14 @@ Field minimum `youtube_publish_result.json`:
 - `caption_result_path`
 - `youtube_publish_result_path`
 - `clip_path`
+- `clip_index`
+- `clip_id`
+- `file_name`
 - `platform`
 - `privacy_status`
 - `video_id`
 - `youtube_watch_url`
+- `youtube_shorts_url`
 - `youtube_studio_url`
 
 Status yang direkomendasikan:
