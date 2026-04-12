@@ -38,6 +38,8 @@ OUT_WIDTH = 720
 OUT_HEIGHT = 1280
 
 _AVAILABLE_ENCODERS = None
+SEGMENT_DURATION_TOLERANCE = 3.0
+AUDIO_START_TOLERANCE = 0.15
 
 
 def emit_log(message, log_hook=None):
@@ -334,6 +336,85 @@ def get_available_encoders():
     return _AVAILABLE_ENCODERS
 
 
+def get_media_duration_seconds(file_path):
+    try:
+        res = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                file_path,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return float((res.stdout or "").strip())
+    except Exception:
+        return None
+
+
+def probe_media_streams(file_path):
+    try:
+        res = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "stream=index,codec_type,start_time,duration",
+                "-of", "json",
+                file_path,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        data = json.loads(res.stdout or "{}")
+        return data.get("streams") or []
+    except Exception:
+        return []
+
+
+def segment_has_audio_offset_issue(file_path):
+    streams = probe_media_streams(file_path)
+    audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
+
+    if audio_stream is None:
+        return True, "missing audio stream"
+
+    try:
+        audio_start = float(audio_stream.get("start_time", 0.0) or 0.0)
+    except Exception:
+        audio_start = 0.0
+
+    try:
+        video_start = float(video_stream.get("start_time", 0.0) or 0.0) if video_stream else 0.0
+    except Exception:
+        video_start = 0.0
+
+    if audio_start > AUDIO_START_TOLERANCE:
+        return True, f"audio starts late at {audio_start:.3f}s"
+
+    if abs(audio_start - video_start) > AUDIO_START_TOLERANCE:
+        return True, f"audio/video start drift {abs(audio_start - video_start):.3f}s"
+
+    return False, ""
+
+
+def is_duration_close_enough(actual_duration, expected_duration):
+    if actual_duration is None:
+        return False
+    expected_duration = max(0.0, float(expected_duration))
+    if expected_duration <= 0:
+        return False
+    min_acceptable = min(
+        max(0.0, expected_duration - SEGMENT_DURATION_TOLERANCE),
+        expected_duration * 0.9,
+    )
+    return float(actual_duration) >= min_acceptable
+
+
 def build_video_codec_args():
     encoders = get_available_encoders()
     if "libx264" in encoders:
@@ -350,6 +431,68 @@ def build_normalized_audio_args():
         "-ar", "48000",
         "-ac", "2",
         "-af", "aresample=async=1:first_pts=0",
+    ]
+
+
+def build_download_commands(video_id, output_file, start=None, duration=None):
+    format_selector = (
+        "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/"
+        "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b"
+    )
+    fallback_selector = "bv*+ba/b"
+
+    def make_command(selector):
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "--force-ipv4",
+            "--quiet", "--no-warnings",
+            "--merge-output-format", "mkv",
+            "-f", selector,
+            "-o", output_file,
+            f"https://youtu.be/{video_id}",
+        ]
+        if start is not None and duration is not None:
+            cmd[5:5] = [
+                "--downloader", "ffmpeg",
+                "--downloader-args",
+                (
+                    f"ffmpeg_i:-ss {start} -t {duration} "
+                    "-hide_banner -loglevel error"
+                ),
+            ]
+        return cmd
+
+    return make_command(format_selector), make_command(fallback_selector)
+
+
+def run_download_command(cmd_primary, cmd_fallback):
+    try:
+        subprocess.run(
+            cmd_primary,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip()
+        if "Requested format is not available" not in stderr:
+            raise
+        subprocess.run(
+            cmd_fallback,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+
+def build_export_audio_args():
+    return [
+        "-map", "0:v:0",
+        "-map", "0:a:0?",
+        *build_normalized_audio_args(),
+        "-shortest",
     ]
 
 
@@ -561,11 +704,15 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
     if end - start < 3:
         return False
 
-    temp_file = f"temp_{index}.mkv"
+    segment_file = f"temp_segment_{index}.mkv"
+    full_file = f"temp_full_{index}.mkv"
     cropped_file = f"temp_cropped_{index}.mp4"
     subtitle_file = f"temp_{index}.srt"
     output_file = os.path.join(OUTPUT_DIR, f"clip_{index}.mp4")
     video_codec_args = build_video_codec_args()
+    expected_duration = max(0.0, end - start)
+    source_file = segment_file
+    source_seek_args = []
 
     emit_log(
         f"[Clip {index}] Processing segment "
@@ -579,76 +726,84 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
         except Exception:
             pass
 
-    cmd_download = [
-        sys.executable, "-m", "yt_dlp",
-        "--force-ipv4",
-        "--quiet", "--no-warnings",
-        "--downloader", "ffmpeg",
-        "--downloader-args",
-        f"ffmpeg_i:-ss {start} -to {end} -hide_banner -loglevel error",
-        "--merge-output-format", "mkv",
-        "-f",
-        "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b",
-        "-o", temp_file,
-        f"https://youtu.be/{video_id}"
-    ]
-    cmd_download_fallback = [
-        sys.executable, "-m", "yt_dlp",
-        "--force-ipv4",
-        "--quiet", "--no-warnings",
-        "--downloader", "ffmpeg",
-        "--downloader-args",
-        f"ffmpeg_i:-ss {start} -to {end} -hide_banner -loglevel error",
-        "--merge-output-format", "mkv",
-        "-f", "bv*+ba/b",
-        "-o", temp_file,
-        f"https://youtu.be/{video_id}"
-    ]
+    cmd_download, cmd_download_fallback = build_download_commands(
+        video_id=video_id,
+        output_file=segment_file,
+        start=start,
+        duration=expected_duration,
+    )
+    cmd_download_full, cmd_download_full_fallback = build_download_commands(
+        video_id=video_id,
+        output_file=full_file,
+    )
 
     try:
-        try:
-            subprocess.run(
-                cmd_download,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-        except subprocess.CalledProcessError as e:
-            stderr = (e.stderr or "").strip()
-            if "Requested format is not available" in stderr:
-                subprocess.run(
-                    cmd_download_fallback,
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-            else:
-                raise
+        run_download_command(cmd_download, cmd_download_fallback)
 
-        if not os.path.exists(temp_file):
+        if not os.path.exists(segment_file):
             emit_log("Failed to download video segment.", log_hook=log_hook)
             return False
+
+        segment_duration = get_media_duration_seconds(segment_file)
+        offset_issue, offset_reason = segment_has_audio_offset_issue(segment_file)
+        if not is_duration_close_enough(segment_duration, expected_duration) or offset_issue:
+            if os.path.exists(segment_file):
+                try:
+                    os.remove(segment_file)
+                except Exception:
+                    pass
+
+            fallback_reason = (
+                (
+                    f"segment duration {segment_duration:.2f}s below target"
+                    if segment_duration is not None
+                    else "segment duration probe failed"
+                )
+                if not is_duration_close_enough(segment_duration, expected_duration)
+                else offset_reason
+            )
+            emit_log(
+                "  Segment download is not safe for export "
+                f"({fallback_reason}); falling back to full download + local trim...",
+                log_hook=log_hook,
+            )
+            if callable(event_hook):
+                try:
+                    event_hook("stage", {"stage": "download_fallback", "clip_index": index})
+                except Exception:
+                    pass
+
+            run_download_command(cmd_download_full, cmd_download_full_fallback)
+            if not os.path.exists(full_file):
+                emit_log("Failed to download fallback source video.", log_hook=log_hook)
+                return False
+
+            source_file = full_file
+            source_seek_args = ["-ss", str(start), "-t", str(expected_duration)]
+        else:
+            emit_log(
+                f"  Downloaded source segment duration: {segment_duration:.2f}s",
+                log_hook=log_hook,
+            )
 
         out_w, out_h = OUT_WIDTH, OUT_HEIGHT
         if crop_mode == "default":
             if OUTPUT_RATIO == "original":
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", temp_file,
+                    "-i", source_file, *source_seek_args,
                     *video_codec_args,
-                    "-c:a", "aac", "-b:a", "128k",
+                    *build_export_audio_args(),
                     cropped_file
                 ]
             else:
                 vf = build_cover_scale_crop_vf(out_w, out_h)
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", temp_file,
+                    "-i", source_file, *source_seek_args,
                     "-vf", vf,
                     *video_codec_args,
-                    "-c:a", "aac", "-b:a", "128k",
+                    *build_export_audio_args(),
                     cropped_file
                 ]
         elif crop_mode == "split_left":
@@ -656,10 +811,10 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                 vf = build_cover_scale_crop_vf(out_w or 720, out_h or 1280) if OUTPUT_RATIO != "original" else None
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", temp_file,
+                    "-i", source_file, *source_seek_args,
                     *([] if not vf else ["-vf", vf]),
                     *video_codec_args,
-                    "-c:a", "aac", "-b:a", "128k",
+                    *build_export_audio_args(),
                     cropped_file
                 ]
             else:
@@ -674,11 +829,12 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                 )
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", temp_file,
+                    "-i", source_file, *source_seek_args,
                     "-filter_complex", vf,
-                    "-map", "[out]", "-map", "0:a?",
+                    "-map", "[out]", "-map", "0:a:0?",
                     *video_codec_args,
-                    "-c:a", "aac", "-b:a", "128k",
+                    *build_normalized_audio_args(),
+                    "-shortest",
                     cropped_file
                 ]
         elif crop_mode == "split_right":
@@ -686,10 +842,10 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                 vf = build_cover_scale_crop_vf(out_w or 720, out_h or 1280) if OUTPUT_RATIO != "original" else None
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", temp_file,
+                    "-i", source_file, *source_seek_args,
                     *([] if not vf else ["-vf", vf]),
                     *video_codec_args,
-                    "-c:a", "aac", "-b:a", "128k",
+                    *build_export_audio_args(),
                     cropped_file
                 ]
             else:
@@ -704,11 +860,12 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                 )
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", temp_file,
+                    "-i", source_file, *source_seek_args,
                     "-filter_complex", vf,
-                    "-map", "[out]", "-map", "0:a?",
+                    "-map", "[out]", "-map", "0:a:0?",
                     *video_codec_args,
-                    "-c:a", "aac", "-b:a", "128k",
+                    *build_normalized_audio_args(),
+                    "-shortest",
                     cropped_file
                 ]
 
@@ -726,7 +883,9 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
             text=True
         )
 
-        os.remove(temp_file)
+        for temp_path in [segment_file, full_file]:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
         # Generate and burn subtitle if enabled
         if use_subtitle:
@@ -804,7 +963,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
 
     except subprocess.CalledProcessError as e:
         # Cleanup temp files
-        for f in [temp_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
+        for f in [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
             if os.path.exists(f):
                 try:
                     os.remove(f)
@@ -818,7 +977,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
         return False
     except Exception as e:
         # Cleanup temp files
-        for f in [temp_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
+        for f in [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
             if os.path.exists(f):
                 try:
                     os.remove(f)

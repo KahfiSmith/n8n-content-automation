@@ -21,7 +21,9 @@ This is the web version of the original project: https://github.com/0xACAB666/yt
 - Scans YouTube videos via URL
 - Extracts YouTube "Most Replayed" (heatmap) segments
 - Automatically selects high-engagement moments
+- Targets final clip duration around 45-60 seconds when the source video allows
 - Configurable pre and post padding for each clip
+- Automatically falls back to full download + local trim when YouTube segment download under-delivers
 - Outputs 9:16 vertical video format (720x1280)
 - No YouTube API key required
 - Supports standard YouTube videos and Shorts
@@ -249,6 +251,7 @@ sudo apt install ffmpeg
 - Verify the YouTube URL is accessible.
 - Some videos might be region-locked or have age restrictions.
 - Try updating yt-dlp: `pip install -U yt-dlp`.
+- If a downloaded segment is shorter than expected, the clipper now retries using a full download and local FFmpeg trim.
 
 ---
 
@@ -263,12 +266,12 @@ sudo apt install ffmpeg
 ### For Tutorial/Vlog Content
 
 - Use **Default** center crop mode.
-- Increase `MAX_DURATION = 90` for longer explanations.
+- The clip window now expands toward a 45-60 second final output when the source allows it.
 - Enable subtitles with the `tiny` model for rapid processing.
 
 ### For Fast-Paced Content
 
-- Reduce `PADDING = 5` to keep clips tight.
+- Reduce `PADDING = 5` to keep clips tight, but the final window still targets at least ~45 seconds when possible.
 - Increase `MIN_SCORE = 0.50` to capture only peak moments.
 - Use the `tiny` model to match the quick editing style.
 

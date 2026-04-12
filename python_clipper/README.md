@@ -23,6 +23,8 @@ Ini versi web dari proyek original: https://github.com/0xACAB666/yt-heatmap-clip
 - Automatically selects high-engagement moments
 - Targets final clip duration around 45-60 seconds when source video allows
 - Configurable pre and post padding for each clip
+- Auto-fallback ke full download + local trim kalau segment download dari YouTube lebih pendek dari target
+- Auto-resync audio timeline saat export; kalau audio stream mulai telat, clipper fallback ke full download + trim akurat
 - Outputs 9:16 vertical video format (720x1280)
 - No YouTube API key required
 - Supports standard YouTube videos and Shorts
@@ -251,6 +253,13 @@ sudo apt install ffmpeg
 - Verify YouTube URL is accessible
 - Some videos might be region-locked or have restrictions
 - Try updating yt-dlp: `pip install -U yt-dlp`
+- Jika log menunjukkan segment terlalu pendek, clipper sekarang otomatis fallback ke full download lalu trim lokal dengan FFmpeg
+
+### Audio hilang di awal clip
+
+- Clipper sekarang memeriksa offset audio/video pada hasil download segment
+- Jika audio stream mulai telat, pipeline otomatis fallback ke full download lalu trim akurat via FFmpeg
+- Untuk hasil lama yang sudah terlanjur dibuat, generate ulang clip karena file lama tidak akan ikut diperbaiki
 
 ---
 
