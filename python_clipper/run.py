@@ -20,7 +20,8 @@ PROJECT_ROOT = os.path.dirname(BASE_DIR)
 DEFAULT_READY_DIR = os.path.join(PROJECT_ROOT, "shared", "ready")
 
 OUTPUT_DIR = DEFAULT_READY_DIR      # Directory where generated clips will be saved
-MAX_DURATION = 60         # Maximum duration (in seconds) for each clip
+MAX_DURATION = 60         # Maximum final duration (in seconds) for each exported clip
+MIN_CLIP_DURATION = 45    # Minimum final duration target (in seconds) for each exported clip
 MIN_SCORE = 0.40          # Minimum heatmap intensity score to be considered viral
 MAX_CLIPS = 10            # Maximum number of clips to generate per video
 MAX_WORKERS = 1           # Number of parallel workers (reserved for future concurrency)
@@ -46,6 +47,58 @@ def emit_log(message, log_hook=None):
             log_hook(message)
         except Exception:
             pass
+
+
+def resolve_clip_window(start_original, source_duration, total_duration):
+    """
+    Build the final export window for a clip.
+
+    Rules:
+    - keep the selected heatmap/custom segment inside the final window
+    - prefer adding symmetric context via PADDING
+    - target a final duration of at least MIN_CLIP_DURATION when source allows
+    - never exceed MAX_DURATION or the source video duration
+    """
+    source_duration = max(0.0, float(source_duration))
+    total_duration = max(0.0, float(total_duration))
+    start_original = max(0.0, float(start_original))
+    end_original = min(start_original + source_duration, total_duration)
+
+    start = max(0.0, start_original - PADDING)
+    end = min(total_duration, end_original + PADDING)
+    current_duration = max(0.0, end - start)
+
+    target_duration = min(
+        total_duration,
+        float(MAX_DURATION),
+        max(float(MIN_CLIP_DURATION), current_duration),
+    )
+
+    if current_duration > target_duration:
+        marker_center = (start_original + end_original) / 2.0
+        half_target = target_duration / 2.0
+        start = max(0.0, marker_center - half_target)
+        end = min(total_duration, start + target_duration)
+        start = max(0.0, end - target_duration)
+        return start, end
+
+    if current_duration < target_duration:
+        needed = target_duration - current_duration
+        extend_left = min(start, needed / 2.0)
+        extend_right = min(total_duration - end, needed - extend_left)
+        start -= extend_left
+        end += extend_right
+
+        remaining = target_duration - (end - start)
+        if remaining > 0:
+            extra_left = min(start, remaining)
+            start -= extra_left
+            remaining -= extra_left
+        if remaining > 0:
+            extra_right = min(total_duration - end, remaining)
+            end += extra_right
+
+    return max(0.0, start), min(total_duration, end)
 
 
 def set_ratio_preset(preset):
@@ -496,10 +549,14 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
         use_subtitle: whether to generate and burn subtitle
     """
     start_original = item["start"]
+    source_duration = item["duration"]
     end_original = item["start"] + item["duration"]
 
-    start = max(0, start_original - PADDING)
-    end = min(end_original + PADDING, total_duration)
+    start, end = resolve_clip_window(
+        start_original=start_original,
+        source_duration=source_duration,
+        total_duration=total_duration,
+    )
 
     if end - start < 3:
         return False
@@ -512,7 +569,8 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
 
     emit_log(
         f"[Clip {index}] Processing segment "
-        f"({int(start)}s - {int(end)}s, padding {PADDING}s)",
+        f"({int(start)}s - {int(end)}s, final {int(end - start)}s, "
+        f"marker {int(source_duration)}s, padding target {PADDING}s)",
         log_hook=log_hook
     )
     if callable(event_hook):

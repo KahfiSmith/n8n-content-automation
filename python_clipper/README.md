@@ -21,6 +21,7 @@ Ini versi web dari proyek original: https://github.com/0xACAB666/yt-heatmap-clip
 - Scans YouTube videos (URL)
 - Extracts YouTube Most Replayed (heatmap) segments
 - Automatically selects high-engagement moments
+- Targets final clip duration around 45-60 seconds when source video allows
 - Configurable pre and post padding for each clip
 - Outputs 9:16 vertical video format (720x1280)
 - No YouTube API key required
@@ -153,6 +154,7 @@ Setelah install, **RESTART** terminal atau VS Code kamu biar FFmpeg kebaca.
 
 - **Format**: MP4 (H.264 video + AAC audio)
 - **Resolution**: 720x1280 (9:16 vertical)
+- **Target Duration**: minimal 45 detik dan maksimal 60 detik per clip jika durasi source memungkinkan
 - **Video Codec**: libx264, CRF 26, ultrafast preset
 - **Audio Codec**: AAC, 128 kbps
 - **Post-process**: otomatis dinormalisasi agar lebih aman untuk upload YouTube (`setsar=1`, AAC 48 kHz, `+faststart`)
@@ -258,17 +260,18 @@ sudo apt install ffmpeg
 
 - Use **Split Right** or **Split Left** mode (facecam in corner)
 - Keep `PADDING = 10` for context before/after action
+- Clip final tetap dijaga di kisaran 45-60 detik agar lebih aman untuk Shorts upload
 - Use `small` or `base` model for accurate gaming terminology
 
 ### For Tutorial/Vlog Content
 
 - Use **Default** center crop mode
-- Increase `MAX_DURATION = 90` for longer explanations
+- Untuk source yang panjang, logic clip tetap akan mencoba memberi konteks minimal 45 detik tanpa lewat 60 detik
 - Enable subtitles with `tiny` model for fast processing
 
 ### For Fast-Paced Content
 
-- Reduce `PADDING = 5` to keep clips tight
+- Reduce `PADDING = 5` kalau mau context lebih rapat, tapi clip final tetap akan dikejar ke minimal 45 detik saat source memungkinkan
 - Increase `MIN_SCORE = 0.50` for only peak moments
 - Use `tiny` model to match quick content style
 
