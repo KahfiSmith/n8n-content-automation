@@ -77,6 +77,7 @@ Trigger-nya:
 - hanya jalan jika `platform_targets` mengandung `youtube_shorts`
 - expand `manifest.clips[]` menjadi satu publish item per clip
 - memakai file `youtube_publish_result_clip_*.json` per clip sebagai checkpoint dedupe
+- setelah upload, workflow akan menunggu processing YouTube sampai `processing_wait_seconds` habis sebelum memutuskan hasil final
 - jika status existing masih `YOUTUBE_PROCESSING_PENDING`, workflow akan melanjutkan pengecekan processing video yang sama dan mencoba menyamakan visibility dengan target terbaru, bukan upload ulang clip baru
 
 ## Artefak hasil
@@ -95,9 +96,15 @@ Status minimum:
 - `YOUTUBE_UPLOADED`
 - `YOUTUBE_UPLOAD_FAILED`
 
+Jika gagal karena limit YouTube, result sekarang akan memberi:
+
+- `error_code: YOUTUBE_UPLOAD_LIMIT_EXCEEDED`
+- `retry_hint` yang menjelaskan bahwa WF-03 tidak bisa memaksa upload sampai limit YouTube reset
+
 Field bantu debugging yang penting:
 
 - `status_checked_at` untuk melihat kapan poll status terakhir dijalankan
+- `youtube_processing_wait_seconds` untuk melihat berapa lama workflow menunggu processing sebelum menyerah ke status pending
 - `publish_mode` untuk membedakan `new_upload`, `reconcile_existing_video`, atau hasil reconcile dari pencarian channel
 - `processing_status_source` untuk melihat apakah status final diambil dari `processingDetails.processingStatus` atau fallback `status.uploadStatus`
 - `youtube_shorts_url` untuk buka clip langsung di player Shorts

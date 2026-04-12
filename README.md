@@ -49,6 +49,8 @@ Catatan:
 - hasil generate sekarang diarahkan ke `shared/ready/`
 - web UI tetap berjalan, hanya lokasi penyimpanan final clip yang dipindahkan ke area handoff
 - durasi final clip sekarang ditargetkan minimal 45 detik dan maksimal 60 detik jika source video memungkinkan, agar tetap aman untuk YouTube Shorts publish
+- jika segment download dari YouTube under-deliver, clipper sekarang fallback ke full download lalu trim lokal agar target durasi tetap tercapai
+- export clip sekarang juga meresinkronkan audio; jika segment hasil download mulai dengan audio telat, clipper fallback ke full download lalu trim akurat
 
 ### `shared/`
 Area handoff antar Python dan automation.
