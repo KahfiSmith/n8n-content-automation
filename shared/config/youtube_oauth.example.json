@@ -1,0 +1,12 @@
+{
+  "client_id": "isi_client_id_google_oauth_web_application",
+  "client_secret": "isi_client_secret_google_oauth_web_application",
+  "refresh_token": "isi_refresh_token_google_dengan_scope_youtube.upload",
+  "privacy_status": "private",
+  "category_id": "22",
+  "notify_subscribers": false,
+  "self_declared_made_for_kids": false,
+  "allow_publish_without_approval": true,
+  "title_suffix": "",
+  "description_footer": ""
+}
