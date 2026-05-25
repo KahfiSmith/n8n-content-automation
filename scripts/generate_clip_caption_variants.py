@@ -27,7 +27,6 @@ DEFAULT_VARIANTS = [
 
 
 PLATFORM_HASHTAGS = {
-    "tiktok": ["#TikTokIndonesia", "#StrategiBisnis", "#Finansial", "#MotivasiBisnis"],
     "youtube_shorts": ["#YoutubeShorts", "#StrategiBisnis", "#Finansial", "#MotivasiBisnis"],
     "facebook_reels": ["#FacebookReels", "#StrategiBisnis", "#Finansial", "#MotivasiBisnis"],
 }
@@ -110,18 +109,11 @@ def get_clips(manifest: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def platform_hashtags(platform: str, base_hashtags: list[str]) -> list[str]:
-    if platform == "tiktok":
-        base_without_youtube = [tag for tag in base_hashtags if tag.lower() != "#youtubeshorts"]
-        return dedupe(PLATFORM_HASHTAGS["tiktok"] + base_without_youtube, limit=8)
     return dedupe(base_hashtags or PLATFORM_HASHTAGS.get(platform, []), limit=8)
 
 
 def caption_for_clip(index: int, platform: str, base_caption: str) -> str:
     variant = DEFAULT_VARIANTS[(index - 1) % len(DEFAULT_VARIANTS)]
-    if platform == "tiktok":
-        return variant
-    if platform == "youtube_shorts":
-        return variant
     if platform == "facebook_reels":
         return variant.replace("ngebahas", "membahas")
     return base_caption or variant
@@ -182,8 +174,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--job-dir", required=True, help="Path folder shared/ready/<job_id>")
     parser.add_argument(
         "--platforms",
-        default="tiktok,youtube_shorts",
-        help="Comma-separated platforms, default: tiktok,youtube_shorts",
+        default="youtube_shorts,facebook_reels",
+        help="Comma-separated platforms, default: youtube_shorts,facebook_reels",
     )
     return parser
 

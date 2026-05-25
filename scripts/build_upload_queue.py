@@ -246,7 +246,7 @@ def write_json(path: Path, rows: list[dict[str, Any]], manifest: dict[str, Any],
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build semi-manual upload queue CSV per clip.")
     parser.add_argument("--job-dir", required=True, help="Path folder shared/ready/<job_id>")
-    parser.add_argument("--platform", default="tiktok", help="Target platform, default: tiktok")
+    parser.add_argument("--platform", default="youtube_shorts", help="Target platform, default: youtube_shorts")
     parser.add_argument("--output", default=None, help="Output CSV path")
     parser.add_argument("--json-output", default=None, help="Optional output JSON path")
     parser.add_argument(
@@ -266,7 +266,7 @@ def main() -> int:
 
         manifest = read_json(job_dir / "manifest.json")
         caption_result = read_json(job_dir / "caption_result.json")
-        platform = str(args.platform).strip() or "tiktok"
+        platform = str(args.platform).strip() or "youtube_shorts"
         rows = build_rows(manifest, caption_result, platform)
 
         output = Path(args.output) if args.output else job_dir / f"upload_queue_{platform}.csv"

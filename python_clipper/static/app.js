@@ -317,6 +317,20 @@ async function postJson(url, body) {
   return data;
 }
 
+function extractYouTubeIdFromUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] || "";
+    if (host !== "youtube.com" && host !== "m.youtube.com") return "";
+    if (url.pathname === "/watch") return url.searchParams.get("v") || "";
+    if (url.pathname.startsWith("/shorts/")) return url.pathname.split("/").filter(Boolean)[1] || "";
+  } catch (_) {
+    return "";
+  }
+  return "";
+}
+
 function openModal(title, bodyEl) {
   $("modalTitle").textContent = title || "";
   const root = $("modalBody");
@@ -592,6 +606,8 @@ async function scan() {
 async function preview() {
   const url = $("url").value.trim();
   if (!url || url === lastPreviewUrl) return;
+  const videoId = extractYouTubeIdFromUrl(url);
+  if (!videoId) return;
   lastPreviewUrl = url;
   const box = $("preview");
   const title = $("pvTitle");
@@ -612,7 +628,11 @@ async function preview() {
     sub.textContent = [uploader, dur].filter(Boolean).join(" • ");
     if (p.thumbnail) img.src = p.thumbnail;
   } catch (e) {
-    box.classList.add("hide");
+    currentPreview = null;
+    title.textContent = "Preview gagal";
+    sub.textContent = e.message || "Gagal ambil metadata video.";
+    img.removeAttribute("src");
+    box.classList.remove("hide");
   }
 }
 
