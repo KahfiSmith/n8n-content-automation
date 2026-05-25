@@ -9,7 +9,6 @@
   "source_video_id": "xxxx",
   "platform_targets": [
     "youtube_shorts",
-    "tiktok",
     "facebook_reels"
   ],
   "approval_mode": "required",
@@ -50,15 +49,6 @@
       ]
     },
     {
-      "platform": "tiktok",
-      "caption": "Masalahnya sering bukan di motivasi, tapi di proses yang terlalu panjang. Kalau workflow dipangkas, upload jadi jauh lebih konsisten.",
-      "hashtags": [
-        "#TikTokIndonesia",
-        "#ContentCreator",
-        "#Workflow"
-      ]
-    },
-    {
       "platform": "facebook_reels",
       "caption": "Konten bisa mandek kalau proses produksinya kebanyakan gesekan. Workflow yang rapi bikin tim lebih gampang jalan terus.",
       "hashtags": [
@@ -85,15 +75,6 @@
           ]
         },
         {
-          "platform": "tiktok",
-          "caption": "Kalau proses upload terlalu ribet, konsistensi biasanya kalah duluan.",
-          "hashtags": [
-            "#TikTokIndonesia",
-            "#ContentCreator",
-            "#Workflow"
-          ]
-        },
-        {
           "platform": "facebook_reels",
           "caption": "Workflow yang kepanjangan bikin konten bagus sering berhenti sebelum sempat dipublish.",
           "hashtags": [
@@ -115,15 +96,6 @@
           "caption": "Sederhanakan alur produksi, lalu konsistensi upload jadi jauh lebih realistis.",
           "hashtags": [
             "#YouTubeShorts",
-            "#ContentStrategy",
-            "#Workflow"
-          ]
-        },
-        {
-          "platform": "tiktok",
-          "caption": "Bukan cuma soal semangat. Workflow yang pendek bikin upload lebih gampang kejaga.",
-          "hashtags": [
-            "#TikTokIndonesia",
             "#ContentStrategy",
             "#Workflow"
           ]

@@ -20,7 +20,6 @@
   "thumbnail_path": "shared/ready/job_20260331_213010_a1b2c3/thumbnail.jpg",
   "platform_targets": [
     "youtube_shorts",
-    "tiktok",
     "facebook_reels"
   ],
   "approval_mode": "required",
