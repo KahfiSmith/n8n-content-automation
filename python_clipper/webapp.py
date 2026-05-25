@@ -59,6 +59,34 @@ def parse_time_to_seconds(value):
     return None
 
 
+def build_fallback_segments(total_duration, max_clips=1):
+    total = max(0.0, float(total_duration or 0))
+    if total <= 0:
+        return []
+
+    count = max(1, int(max_clips or 1))
+    clip_duration = min(float(core.MAX_DURATION), total)
+    if total <= clip_duration:
+        return [{"start": 0.0, "duration": total, "score": 0.0, "source": "fallback"}]
+
+    usable_end = max(0.0, total - clip_duration)
+    if count == 1:
+        # Skip likely intro, but keep enough room for a full Shorts-length clip.
+        start = min(usable_end, max(0.0, total * 0.12))
+        return [{"start": start, "duration": clip_duration, "score": 0.0, "source": "fallback"}]
+
+    segments = []
+    step = usable_end / max(1, count - 1)
+    for index in range(count):
+        segments.append({
+            "start": min(usable_end, step * index),
+            "duration": clip_duration,
+            "score": 0.0,
+            "source": "fallback",
+        })
+    return segments
+
+
 def set_job(job_id, **patch):
     with jobs_lock:
         job = jobs.get(job_id)
@@ -163,7 +191,14 @@ def run_job(job_id, payload):
             add_log(job_id, "Scan heatmap...")
             segments = core.ambil_most_replayed(video_id)
             if not segments:
-                raise RuntimeError("Tidak ada heatmap/Most Replayed data")
+                fallback_count = 1 if max_clips == 1 else max(1, min(max_clips or 1, 3))
+                add_log(
+                    job_id,
+                    "Tidak ada heatmap/Most Replayed data; pakai fallback auto range.",
+                )
+                segments = build_fallback_segments(total_duration, fallback_count)
+                if not segments:
+                    raise RuntimeError("Tidak ada heatmap/Most Replayed data dan fallback range gagal dibuat")
             targets = segments[: max(1, max_clips or 10)]
 
         set_job(job_id, total=len(targets), done=0, status_text="processing")

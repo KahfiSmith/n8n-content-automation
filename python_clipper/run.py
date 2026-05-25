@@ -36,10 +36,14 @@ SUBTITLE_LOCATION = "bottom"
 OUTPUT_RATIO = "9:16"
 OUT_WIDTH = 720
 OUT_HEIGHT = 1280
+LIGHTWEIGHT_EXPORT = True
+LIGHTWEIGHT_WIDTH = 540
+LIGHTWEIGHT_HEIGHT = 960
 
 _AVAILABLE_ENCODERS = None
 SEGMENT_DURATION_TOLERANCE = 3.0
 AUDIO_START_TOLERANCE = 0.15
+ALWAYS_FULL_DOWNLOAD_TRIM = False
 
 
 def emit_log(message, log_hook=None):
@@ -107,7 +111,10 @@ def set_ratio_preset(preset):
     global OUTPUT_RATIO, OUT_WIDTH, OUT_HEIGHT
     OUTPUT_RATIO = preset
     if preset == "9:16":
-        OUT_WIDTH, OUT_HEIGHT = 720, 1280
+        if LIGHTWEIGHT_EXPORT:
+            OUT_WIDTH, OUT_HEIGHT = LIGHTWEIGHT_WIDTH, LIGHTWEIGHT_HEIGHT
+        else:
+            OUT_WIDTH, OUT_HEIGHT = 720, 1280
         return
     if preset == "1:1":
         OUT_WIDTH, OUT_HEIGHT = 720, 720
@@ -418,19 +425,27 @@ def is_duration_close_enough(actual_duration, expected_duration):
 def build_video_codec_args():
     encoders = get_available_encoders()
     if "libx264" in encoders:
-        return ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "26"]
+        return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "30"]
     if "libopenh264" in encoders:
-        return ["-c:v", "libopenh264", "-b:v", "3M"]
+        return ["-c:v", "libopenh264", "-b:v", "1200k"]
     raise RuntimeError("No supported H.264 encoder found. Install FFmpeg with libx264 or libopenh264 support.")
 
 
-def build_normalized_audio_args():
+def build_normalized_audio_args(audio_duration=None):
+    audio_filter = "aresample=async=1:first_pts=0"
+    if audio_duration is not None:
+        duration = max(0.0, float(audio_duration))
+        audio_filter = (
+            f"atrim=start=0:duration={duration},"
+            "asetpts=N/SR/TB,"
+            "aresample=async=1:first_pts=0"
+        )
     return [
         "-c:a", "aac",
         "-b:a", "128k",
         "-ar", "48000",
         "-ac", "2",
-        "-af", "aresample=async=1:first_pts=0",
+        "-af", audio_filter,
     ]
 
 
@@ -487,24 +502,28 @@ def run_download_command(cmd_primary, cmd_fallback):
         )
 
 
-def build_export_audio_args():
+def build_export_audio_args(audio_duration=None):
     return [
         "-map", "0:v:0",
         "-map", "0:a:0?",
-        *build_normalized_audio_args(),
+        *build_normalized_audio_args(audio_duration),
         "-shortest",
     ]
 
 
-def normalize_output_for_publish(output_file, event_hook=None, log_hook=None):
+def normalize_output_for_publish(output_file, max_duration=None, event_hook=None, log_hook=None):
     normalized_file = output_file + ".normalized.mp4"
+    trim_args = []
+    if max_duration is not None:
+        trim_args = ["-t", str(max(0.0, float(max_duration)))]
     cmd_normalize = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-i", output_file,
+        *trim_args,
         "-map", "0:v:0", "-map", "0:a:0?",
         "-vf", "setsar=1,format=yuv420p",
         *build_video_codec_args(),
-        *build_normalized_audio_args(),
+        *build_normalized_audio_args(max_duration),
         "-movflags", "+faststart",
         "-shortest",
         normalized_file,
@@ -525,6 +544,21 @@ def normalize_output_for_publish(output_file, event_hook=None, log_hook=None):
         text=True
     )
     os.replace(normalized_file, output_file)
+
+
+def assert_valid_output_file(output_file):
+    if not os.path.exists(output_file):
+        raise RuntimeError("Output clip tidak dibuat oleh FFmpeg.")
+    file_size = os.path.getsize(output_file)
+    if file_size < 1024 * 1024:
+        raise RuntimeError(f"Output clip invalid atau terlalu kecil ({file_size} bytes).")
+    streams = probe_media_streams(output_file)
+    has_video = any(s.get("codec_type") == "video" for s in streams)
+    if not has_video:
+        raise RuntimeError("Output clip invalid: tidak ada video stream.")
+    duration = get_media_duration_seconds(output_file)
+    if duration is None or duration <= 0:
+        raise RuntimeError("Output clip invalid: durasi tidak terbaca.")
 
 
 def ambil_most_replayed(video_id):
@@ -738,33 +772,9 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
     )
 
     try:
-        run_download_command(cmd_download, cmd_download_fallback)
-
-        if not os.path.exists(segment_file):
-            emit_log("Failed to download video segment.", log_hook=log_hook)
-            return False
-
-        segment_duration = get_media_duration_seconds(segment_file)
-        offset_issue, offset_reason = segment_has_audio_offset_issue(segment_file)
-        if not is_duration_close_enough(segment_duration, expected_duration) or offset_issue:
-            if os.path.exists(segment_file):
-                try:
-                    os.remove(segment_file)
-                except Exception:
-                    pass
-
-            fallback_reason = (
-                (
-                    f"segment duration {segment_duration:.2f}s below target"
-                    if segment_duration is not None
-                    else "segment duration probe failed"
-                )
-                if not is_duration_close_enough(segment_duration, expected_duration)
-                else offset_reason
-            )
+        if ALWAYS_FULL_DOWNLOAD_TRIM:
             emit_log(
-                "  Segment download is not safe for export "
-                f"({fallback_reason}); falling back to full download + local trim...",
+                "  Using full download + local trim for safer audio sync and exact duration...",
                 log_hook=log_hook,
             )
             if callable(event_hook):
@@ -772,19 +782,65 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     event_hook("stage", {"stage": "download_fallback", "clip_index": index})
                 except Exception:
                     pass
-
             run_download_command(cmd_download_full, cmd_download_full_fallback)
             if not os.path.exists(full_file):
                 emit_log("Failed to download fallback source video.", log_hook=log_hook)
                 return False
-
             source_file = full_file
             source_seek_args = ["-ss", str(start), "-t", str(expected_duration)]
         else:
-            emit_log(
-                f"  Downloaded source segment duration: {segment_duration:.2f}s",
-                log_hook=log_hook,
-            )
+            run_download_command(cmd_download, cmd_download_fallback)
+
+            if not os.path.exists(segment_file):
+                emit_log("Failed to download video segment.", log_hook=log_hook)
+                return False
+
+            segment_duration = get_media_duration_seconds(segment_file)
+            offset_issue, offset_reason = segment_has_audio_offset_issue(segment_file)
+            too_long = segment_duration is not None and segment_duration > expected_duration + SEGMENT_DURATION_TOLERANCE
+            if not is_duration_close_enough(segment_duration, expected_duration) or offset_issue or too_long:
+                if os.path.exists(segment_file):
+                    try:
+                        os.remove(segment_file)
+                    except Exception:
+                        pass
+
+                if too_long:
+                    fallback_reason = f"segment duration {segment_duration:.2f}s above target"
+                else:
+                    fallback_reason = (
+                        (
+                            f"segment duration {segment_duration:.2f}s below target"
+                            if segment_duration is not None
+                            else "segment duration probe failed"
+                        )
+                        if not is_duration_close_enough(segment_duration, expected_duration)
+                        else offset_reason
+                    )
+                emit_log(
+                    "  Segment download is not safe for export "
+                    f"({fallback_reason}); falling back to full download + local trim...",
+                    log_hook=log_hook,
+                )
+                if callable(event_hook):
+                    try:
+                        event_hook("stage", {"stage": "download_fallback", "clip_index": index})
+                    except Exception:
+                        pass
+
+                run_download_command(cmd_download_full, cmd_download_full_fallback)
+                if not os.path.exists(full_file):
+                    emit_log("Failed to download fallback source video.", log_hook=log_hook)
+                    return False
+
+                source_file = full_file
+                source_seek_args = ["-ss", str(start), "-t", str(expected_duration)]
+            else:
+                source_seek_args = ["-t", str(expected_duration)]
+                emit_log(
+                    f"  Downloaded source segment duration: {segment_duration:.2f}s",
+                    log_hook=log_hook,
+                )
 
         out_w, out_h = OUT_WIDTH, OUT_HEIGHT
         if crop_mode == "default":
@@ -793,7 +849,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-i", source_file, *source_seek_args,
                     *video_codec_args,
-                    *build_export_audio_args(),
+                    *build_export_audio_args(expected_duration),
                     cropped_file
                 ]
             else:
@@ -803,7 +859,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "-i", source_file, *source_seek_args,
                     "-vf", vf,
                     *video_codec_args,
-                    *build_export_audio_args(),
+                    *build_export_audio_args(expected_duration),
                     cropped_file
                 ]
         elif crop_mode == "split_left":
@@ -814,7 +870,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "-i", source_file, *source_seek_args,
                     *([] if not vf else ["-vf", vf]),
                     *video_codec_args,
-                    *build_export_audio_args(),
+                    *build_export_audio_args(expected_duration),
                     cropped_file
                 ]
             else:
@@ -833,7 +889,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "-filter_complex", vf,
                     "-map", "[out]", "-map", "0:a:0?",
                     *video_codec_args,
-                    *build_normalized_audio_args(),
+                    *build_normalized_audio_args(expected_duration),
                     "-shortest",
                     cropped_file
                 ]
@@ -845,7 +901,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "-i", source_file, *source_seek_args,
                     *([] if not vf else ["-vf", vf]),
                     *video_codec_args,
-                    *build_export_audio_args(),
+                    *build_export_audio_args(expected_duration),
                     cropped_file
                 ]
             else:
@@ -864,7 +920,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "-filter_complex", vf,
                     "-map", "[out]", "-map", "0:a:0?",
                     *video_codec_args,
-                    *build_normalized_audio_args(),
+                    *build_normalized_audio_args(expected_duration),
                     "-shortest",
                     cropped_file
                 ]
@@ -913,9 +969,11 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                 cmd_subtitle = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-i", cropped_file,
+                    "-t", str(expected_duration),
                     "-vf", f"subtitles='{subtitle_path}'{fontsdir_arg}:force_style='{force_style}'",
                     *video_codec_args,
-                    "-c:a", "copy",
+                    *build_normalized_audio_args(expected_duration),
+                    "-shortest",
                     output_file
                 ]
                 
@@ -949,9 +1007,11 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
 
         normalize_output_for_publish(
             output_file,
+            max_duration=expected_duration,
             event_hook=event_hook,
             log_hook=log_hook,
         )
+        assert_valid_output_file(output_file)
 
         emit_log("Clip successfully generated.", log_hook=log_hook)
         if callable(event_hook):
