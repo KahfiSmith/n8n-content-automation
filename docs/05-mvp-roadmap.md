@@ -105,7 +105,6 @@ Output:
 
 ## Phase 6 — Expansion
 Output:
-- TikTok
 - Facebook Reels
 - webhook integration
 - better retries

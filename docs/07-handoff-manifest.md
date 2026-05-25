@@ -46,7 +46,7 @@ shared/ready/
 - subtitle adalah bagian dari output generator clip jika fitur subtitle diaktifkan, jadi tidak perlu field manifest terpisah kecuali nanti memang dibutuhkan.
 - `clip_path` adalah shortcut ke clip pertama agar alur sederhana di n8n tetap mudah.
 - `clips` adalah daftar semua clip hasil satu job agar n8n bisa loop tanpa menebak isi folder.
-- jika UI Python tidak mengirim `platform_targets`, helper manifest default ke `["youtube_shorts", "tiktok", "facebook_reels"]` agar konsisten dengan target publish MVP lintas platform.
+- jika UI Python tidak mengirim `platform_targets`, helper manifest default ke `["youtube_shorts", "facebook_reels"]` agar konsisten dengan target publish MVP lintas platform.
 - penulisan manifest sebaiknya additive melalui helper handoff, bukan dengan mengubah logic inti clipper dulu.
 
 ## File hasil intake yang direkomendasikan

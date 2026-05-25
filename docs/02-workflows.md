@@ -14,7 +14,6 @@ Mendefinisikan workflow n8n modular untuk kasus saat clip sudah tersedia dari fo
 ## Future / optional
 
 - Approval Gate
-- Publish TikTok
 - Publish Facebook Reels
 - Finalize
 - Error Handler
@@ -80,7 +79,6 @@ Menghasilkan caption dan hashtag yang relevan dengan isi clip tanpa output templ
 - `caption_result.json`
 - `caption_pack`
 - `clip_caption_pack`
-- `upload_queue_tiktok.csv`
 - `upload_queue_youtube_shorts.csv`
 - `hashtags`
 - `content_angle`
@@ -99,8 +97,8 @@ Menghasilkan caption dan hashtag yang relevan dengan isi clip tanpa output templ
 - `caption_pack` adalah fallback global per platform dan tetap menyimpan `platform`, `caption`, dan `hashtags`
 - `clip_caption_pack` adalah sumber utama untuk upload queue; jumlah item harus sama dengan jumlah `manifest.clips`
 - setiap item `clip_caption_pack` harus menyimpan `clip_id`, `clip_index`, `file_name`, `clip_path`, dan `captions[]` per platform
-- `WF-02` otomatis menulis CSV upload manual untuk `tiktok` dan `youtube_shorts` setelah `caption_result.json` berhasil dibuat
-- untuk kebutuhan queue manual, `WF-02` selalu meminta caption `youtube_shorts` dan `tiktok` walau `manifest.platform_targets` lama hanya berisi salah satunya
+- `WF-02` otomatis menulis CSV upload manual untuk `youtube_shorts` setelah `caption_result.json` berhasil dibuat
+- untuk kebutuhan queue manual, `WF-02` selalu meminta caption `youtube_shorts` walau `manifest.platform_targets` lama hanya berisi salah satunya
 - workflow publish `WF-03` boleh menurunkan title upload secara internal dari caption jika platform membutuhkannya
 - jika `transcript_path` kosong, `WF-02` sebaiknya tetap memakai `source_video_title`, `source_video_uploader`, dan deskripsi sumber dari `manifest.json` agar caption tidak jatuh ke fallback generik
 - `next_stage` default untuk MVP lokal sekarang adalah `WF-03_PUBLISH_YOUTUBE_SHORTS`
@@ -179,19 +177,21 @@ Status yang relevan untuk approval tetap:
 
 ---
 
-## Future: Publish TikTok
+## Future: Publish TikTok via Zapier
 
-Pisahkan workflow TikTok dari YouTube dan aktifkan hanya jika target platform memang sudah siap.
+TikTok tidak lagi didukung via kode custom di repo ini karena API developer TikTok mensyaratkan proses review aplikasi yang panjang dan akses yang terbatas.
 
-Untuk sekarang, TikTok disiapkan dulu lewat helper CLI:
+Jalur yang direkomendasikan untuk MVP adalah Zapier sebagai bridge:
 
-- `python3 scripts/write_tiktok_config.py`
-- `python3 scripts/tiktok_oauth.py auth-url --redirect-uri ...`
-- `python3 scripts/tiktok_oauth.py exchange-code --code ... --redirect-uri ...`
-- `python3 scripts/tiktok_content_post.py creator-info`
-- `python3 scripts/tiktok_content_post.py post-job --job-dir shared/ready/<job_id> --post-mode UPLOAD`
+1. n8n membaca `caption_result.json`
+2. n8n expand satu item per clip
+3. n8n mengirim payload ke Zapier Catch Hook
+4. Zapier upload video ke TikTok
+5. n8n menulis marker `tiktok_zapier_result_clip_*.json`
 
-Jadi belum ada workflow aktif bernomor baru. Ini sengaja supaya alur 1-2-3 yang sudah stabil tidak tercampur integrasi platform yang masih tahap setup.
+Catatan penting: Zapier tidak bisa membaca path lokal Docker seperti `/files/ready/...`. Payload ke Zapier harus memakai URL video yang bisa diakses Zapier, misalnya Google Drive, Dropbox, R2/S3 public atau signed URL, atau file endpoint di VPS.
+
+Dokumen setup: [10 - Setup TikTok via Zapier](10-tiktok-zapier-setup.md)
 
 ---
 
@@ -254,7 +254,7 @@ Menangani semua error dengan pola konsisten.
 - Intake via polling folder `ready/`
 - Caption generation via polling `intake_result.json` yang valid
 - Publish YouTube sebagai stage ketiga
-- Default manifest clipper menargetkan `youtube_shorts`, `tiktok`, dan `facebook_reels`
+- Default manifest clipper menargetkan `youtube_shorts` dan `facebook_reels`
 - Workflow publish tetap harus branch per `platform_targets`, bukan mengasumsikan semua platform selalu aktif
 
 ### Next step

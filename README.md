@@ -40,6 +40,178 @@ Perubahan di repo ini dibuat konservatif:
 └── .env.example
 ```
 
+## Cara Running Repo
+
+Repo ini jalan dalam dua bagian:
+
+- `python_clipper/` untuk generate clip video secara manual
+- `n8n` lewat Docker Compose untuk automation setelah clip siap
+
+### 1. Siapkan environment
+
+Dari root repo:
+
+```bash
+cp .env.example .env
+```
+
+Isi `.env` sesuai kebutuhan lokal. Minimal pastikan konfigurasi berikut tersedia:
+
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `N8N_ENCRYPTION_KEY`
+- `N8N_HOST`
+- `N8N_PROTOCOL`
+- `N8N_EDITOR_BASE_URL`
+- `WEBHOOK_URL`
+
+Untuk fitur caption AI, isi juga:
+
+- `OPENAI_API_KEY`
+
+Untuk publish YouTube, config OAuth dibaca dari:
+
+```text
+shared/config/youtube_oauth.json
+```
+
+Field penting di file itu:
+
+- `client_id`
+- `client_secret`
+- `refresh_token`
+- `privacy_status`
+- `allow_publish_without_approval`
+
+### 2. Jalankan n8n dan Postgres
+
+Dari root repo:
+
+```bash
+docker compose up -d
+```
+
+Cek service:
+
+```bash
+docker compose ps
+```
+
+Buka n8n:
+
+```text
+http://localhost:5678
+```
+
+Folder `shared/` di host akan terbaca di container n8n sebagai:
+
+```text
+/files
+```
+
+Contoh mapping penting:
+
+```text
+shared/ready/job_id/manifest.json -> /files/ready/job_id/manifest.json
+shared/config/youtube_oauth.json -> /files/config/youtube_oauth.json
+```
+
+### 3. Jalankan Python clipper
+
+Dari root repo:
+
+```bash
+cd python_clipper
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Jika ingin memakai subtitle AI lokal:
+
+```bash
+python -m pip install faster-whisper
+```
+
+Jalankan web app clipper:
+
+```bash
+python webapp.py
+```
+
+Buka:
+
+```text
+http://127.0.0.1:5000
+```
+
+Output clip akan dibuat ke:
+
+```text
+shared/ready/<job_id>/
+```
+
+Minimal output yang harus ada sebelum n8n dipakai:
+
+- `manifest.json`
+- `clip_1.mp4`
+- `clip_2.mp4` jika ada lebih dari satu clip
+
+### 4. Jalankan workflow n8n
+
+Urutan manual yang direkomendasikan:
+
+1. `WF-01 Intake Clip + Validate Assets`
+2. `WF-02 Generate Caption Auto Schedule`
+3. `WF-03 Publish YouTube Shorts Auto Schedule`
+
+Catatan:
+
+- `WF-01` membaca job clip di `shared/ready/`
+- `WF-02` membuat `caption_result.json` dan CSV upload queue
+- `WF-03` publish ke YouTube Shorts memakai `caption_result.json`, `manifest.json`, dan file clip
+- `WF-03` menulis result per clip seperti `youtube_publish_result_clip_01.json`
+
+Jika workflow belum muncul di n8n, import workflow dari folder:
+
+```text
+shared/imports/
+```
+
+Contoh import dari container:
+
+```bash
+docker compose exec n8n n8n import:workflow --input=/files/imports/wf-01-intake-clip-validate-assets.json
+docker compose exec n8n n8n import:workflow --input=/files/imports/wf-02-generate-caption-auto-schedule.json
+docker compose exec n8n n8n import:workflow --input=/files/imports/wf-03-publish-youtube-shorts-auto-schedule.json
+```
+
+### 5. Cek hasil publish YouTube
+
+Setelah `WF-03`, cek file:
+
+```text
+shared/ready/<job_id>/youtube_publish_result_clip_01.json
+shared/ready/<job_id>/youtube_publish_result_clip_02.json
+```
+
+Status yang mungkin muncul:
+
+- `YOUTUBE_UPLOADED`: upload sudah diterima dan processing YouTube selesai
+- `YOUTUBE_PROCESSING_PENDING`: upload diterima, tapi YouTube masih processing
+- `YOUTUBE_UPLOAD_FAILED`: upload gagal, baca `error_code` dan `error_message`
+
+Untuk cek status processing dari terminal:
+
+```bash
+docker compose cp scripts/check_youtube_processing.js n8n:/tmp/check_youtube_processing.js
+docker compose exec n8n node /tmp/check_youtube_processing.js --config /files/config/youtube_oauth.json --job-dir /files/ready/<job_id>
+```
+
+Jika error `YOUTUBE_UPLOAD_LIMIT_EXCEEDED` muncul, itu berarti YouTube sedang menolak upload tambahan dari akun/channel tersebut. Tunggu limit reset sebelum rerun `WF-03`.
+
 ## Peran folder utama
 
 ### `python_clipper/`

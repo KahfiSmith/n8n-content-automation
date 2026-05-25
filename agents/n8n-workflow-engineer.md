@@ -24,7 +24,6 @@ Agent ini fokus mendesain workflow n8n yang modular, ringan, dan tahan terhadap 
 - `WF-03-generate-caption`
 - `WF-04-approval-gate`
 - `WF-05-publish-youtube`
-- `WF-06-publish-tiktok`
 - `WF-07-publish-facebook`
 - `WF-08-finalize-and-archive`
 - `WF-09-error-handler`

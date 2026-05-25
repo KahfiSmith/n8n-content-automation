@@ -24,8 +24,6 @@ shared/
 │   └── caption_ai.json
 │   ├── youtube_oauth.example.json
 │   └── youtube_oauth.json
-│   ├── tiktok_posting.example.json
-│   └── tiktok_posting.json
 ├── ready/
 │   └── job_<timestamp>_<shortid>/
 │       ├── clip_1.mp4
@@ -49,7 +47,7 @@ shared/
 Folder utama yang dibaca n8n. Hanya job yang sudah final dan lengkap yang boleh masuk ke sini.
 
 ### `config/`
-Konfigurasi lokal yang dibaca workflow n8n atau helper CLI. Untuk caption AI, file yang dipakai adalah `caption_ai.json`. Untuk publish YouTube, file yang dipakai adalah `youtube_oauth.json`. Untuk TikTok helper, file yang dipakai adalah `tiktok_posting.json`. File-file ini sebaiknya digenerate dari `.env` dan tidak di-commit.
+Konfigurasi lokal yang dibaca workflow n8n atau helper CLI. Untuk caption AI, file yang dipakai adalah `caption_ai.json`. Untuk publish YouTube, file yang dipakai adalah `youtube_oauth.json`. File-file ini sebaiknya digenerate dari `.env` dan tidak di-commit.
 
 ### `published/`
 Job yang sudah selesai publish atau disimpan untuk histori.
@@ -107,7 +105,7 @@ Contoh minimal:
   ],
   "transcript_path": "shared/ready/job_20260331_213010_a1b2c3/transcript.txt",
   "thumbnail_path": "shared/ready/job_20260331_213010_a1b2c3/thumbnail.jpg",
-  "platform_targets": ["youtube_shorts", "tiktok", "facebook_reels"],
+  "platform_targets": ["youtube_shorts", "facebook_reels"],
   "approval_mode": "required",
   "created_at": "2026-03-31T21:30:10+07:00",
   "status": "ready"
@@ -115,14 +113,13 @@ Contoh minimal:
 ```
 
 Catatan:
-- jika `platform_targets` tidak dikirim dari UI Python, helper manifest akan mengisi default `["youtube_shorts", "tiktok", "facebook_reels"]`
-- gunakan label tetap `youtube_shorts`, `tiktok`, dan `facebook_reels`, jangan singkat jadi `fb` atau label lain yang tidak konsisten
+- jika `platform_targets` tidak dikirim dari UI Python, helper manifest akan mengisi default `["youtube_shorts", "facebook_reels"]`
+- gunakan label tetap `youtube_shorts` dan `facebook_reels`, jangan singkat jadi `fb` atau label lain yang tidak konsisten
 - `intake_result.json` dipakai sebagai marker dedupe untuk workflow intake
 - `caption_result.json` dipakai sebagai marker dedupe untuk workflow caption
 - `shared/config/caption_ai.json` dipakai sebagai sumber config lokal untuk workflow caption
 - `youtube_publish_result_clip_*.json` dipakai sebagai marker dedupe per clip untuk workflow publish YouTube
 - `shared/config/youtube_oauth.json` dipakai sebagai sumber config lokal untuk workflow publish YouTube
-- `shared/config/tiktok_posting.json` dipakai sebagai sumber config lokal untuk helper TikTok
 - `WF-03` boleh membentuk title upload internal dari caption bila `caption_result.json` tidak menyimpan title
 
 ---

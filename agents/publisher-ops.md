@@ -21,7 +21,6 @@ Agent ini fokus pada reliability publishing, approval, status per platform, dan 
 ## Platform model
 Pisahkan status seperti ini:
 - `youtube_status`
-- `tiktok_status`
 - `facebook_status`
 
 Atau model array/object:
@@ -30,7 +29,6 @@ Atau model array/object:
 {
   "publish": {
     "youtube": {"status": "pending"},
-    "tiktok": {"status": "failed"},
     "facebook": {"status": "published"}
   }
 }

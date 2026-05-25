@@ -17,4 +17,3 @@ Dokumen yang penting untuk mapping perubahan:
 - `07-handoff-manifest.md` untuk kontrak handoff
 - `08-structure-mapping.md` untuk peta fungsi folder dan aturan perubahan
 - `08-youtube-shorts-setup.md` untuk setup publish YouTube
-- `10-tiktok-content-posting-setup.md` untuk helper setup TikTok
