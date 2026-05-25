@@ -18,7 +18,7 @@
       "id": "f6108617-b50b-4d75-a6f6-df88b50ee2c4",
       "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
+      "typeVersion": 1.2,
       "position": [
         -1060,
         260
@@ -26,13 +26,12 @@
     },
     {
       "parameters": {
-        "operation": "read",
         "fileSelector": "/files/ready/*/manifest.json",
-        "options": {}
+        "dataPropertyName": "data"
       },
       "id": "48cc4f71-af60-42c3-9ad9-2df7f4eefcb2",
       "name": "Read Manifest Files",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFiles",
       "typeVersion": 1,
       "position": [
         -840,
@@ -41,17 +40,12 @@
     },
     {
       "parameters": {
-        "operation": "fromJson",
-        "binaryPropertyName": "data",
-        "destinationKey": "manifest",
-        "options": {
-          "keepSource": "both"
-        }
+        "jsCode": "const output = [];\nfor (let i = 0; i < $input.all().length; i++) {\n  const item = $input.all()[i];\n  try {\n    const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n    const text = buffer.toString('utf8').replace(/^\\uFEFF/, '');\n    output.push({\n      json: {\n        ...item.json,\n        \"manifest\": JSON.parse(text),\n      },\n      binary: item.binary,\n      pairedItem: { item: i },\n    });\n  } catch (error) {\n    if (item.json && item.json.error) {\n      output.push({ json: item.json, binary: item.binary, pairedItem: { item: i } });\n      continue;\n    }\n    throw error;\n  }\n}\nreturn output;"
       },
       "id": "6b3fb952-d17b-4a94-b040-20db57360919",
       "name": "Extract Manifest JSON",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -720,
         260
@@ -75,19 +69,19 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "={{ $json.intake_result_path }}",
-        "options": {}
+        "filePath": "={{ $json.intake_result_path }}",
+        "dataPropertyName": "data"
       },
       "id": "5b56b4fb-b373-4475-8d92-d6fcd8095648",
       "name": "Read Existing Intake Result",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFile",
       "typeVersion": 1,
       "position": [
         -480,
         260
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -100,7 +94,7 @@
       "id": "4e7d335d-c0ba-432e-b2d5-f5d8343cd4f0",
       "name": "Merge Existing Intake Context",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
+      "typeVersion": 3.1,
       "position": [
         -360,
         120
@@ -174,19 +168,19 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "={{ $json.clip_path_abs }}",
-        "options": {}
+        "filePath": "={{ $json.clip_path_abs }}",
+        "dataPropertyName": "data"
       },
       "id": "fc8287e1-2b9b-4492-b9d4-bb5b4e1f2bea",
       "name": "Read Clip File",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFile",
       "typeVersion": 1,
       "position": [
         120,
         160
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -200,7 +194,7 @@
       "id": "17800e59-49df-4e6d-b5a8-f00c2ddd25a0",
       "name": "Merge Success Context",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
+      "typeVersion": 3.1,
       "position": [
         360,
         160

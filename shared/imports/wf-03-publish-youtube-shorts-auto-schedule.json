@@ -13,7 +13,7 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 1
+              "minutesInterval": 15
             }
           ]
         }
@@ -21,7 +21,7 @@
       "id": "d6156c77-4d27-4a88-9177-c7162c481fab",
       "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
+      "typeVersion": 1.2,
       "position": [
         -3160,
         260
@@ -29,13 +29,12 @@
     },
     {
       "parameters": {
-        "operation": "read",
         "fileSelector": "/files/ready/*/caption_result.json",
-        "options": {}
+        "dataPropertyName": "data"
       },
       "id": "7d0db776-c2c2-43f8-8d8f-7b93c8a5b608",
       "name": "Read Caption Result Files",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFiles",
       "typeVersion": 1,
       "position": [
         -2940,
@@ -44,17 +43,12 @@
     },
     {
       "parameters": {
-        "operation": "fromJson",
-        "binaryPropertyName": "data",
-        "destinationKey": "caption_result",
-        "options": {
-          "keepSource": "both"
-        }
+        "jsCode": "const output = [];\nfor (let i = 0; i < $input.all().length; i++) {\n  const item = $input.all()[i];\n  try {\n    const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n    const text = buffer.toString('utf8').replace(/^\\uFEFF/, '');\n    output.push({\n      json: {\n        ...item.json,\n        \"caption_result\": JSON.parse(text),\n      },\n      binary: item.binary,\n      pairedItem: { item: i },\n    });\n  } catch (error) {\n    if (item.json && item.json.error) {\n      output.push({ json: item.json, binary: item.binary, pairedItem: { item: i } });\n      continue;\n    }\n    throw error;\n  }\n}\nreturn output;"
       },
       "id": "f66c869e-a7bb-4f32-b4a4-fd91bc1d92b7",
       "name": "Extract Caption Result JSON",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -2720,
         260
@@ -111,13 +105,12 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "={{ $json.youtube_publish_result_path }}",
-        "options": {}
+        "filePath": "={{ $json.youtube_publish_result_path }}",
+        "dataPropertyName": "data"
       },
       "id": "4f45d9f1-7540-4ebc-b75d-8875bf4940dd",
       "name": "Read Existing YouTube Result",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFile",
       "typeVersion": 1,
       "position": [
         -2060,
@@ -139,7 +132,7 @@
       "id": "844e4db1-97b2-4ea8-9bf6-9639c4fddd8a",
       "name": "Merge Publish Context",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
+      "typeVersion": 3.1,
       "position": [
         -1840,
         260
@@ -180,13 +173,12 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "={{ $json.manifest_path }}",
-        "options": {}
+        "filePath": "={{ $json.manifest_path }}",
+        "dataPropertyName": "data"
       },
       "id": "a88c67c4-1b95-43dd-9f9b-9aa9a10cd5f7",
       "name": "Read Manifest File",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFile",
       "typeVersion": 1,
       "position": [
         -1400,
@@ -206,7 +198,7 @@
       "id": "7581ef91-97d9-4cae-8ce2-47439a2b2107",
       "name": "Merge Manifest Context",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
+      "typeVersion": 3.1,
       "position": [
         -1180,
         360
@@ -214,17 +206,12 @@
     },
     {
       "parameters": {
-        "operation": "fromJson",
-        "binaryPropertyName": "data",
-        "destinationKey": "manifest",
-        "options": {
-          "keepSource": "both"
-        }
+        "jsCode": "const output = [];\nfor (let i = 0; i < $input.all().length; i++) {\n  const item = $input.all()[i];\n  const binaryData = item.binary && item.binary.data ? item.binary.data : null;\n\n  if (!binaryData) {\n    output.push({\n      json: {\n        ...item.json,\n        manifest: null,\n        manifest_binary_available: false,\n        manifest_read_error: 'Manifest file tidak terbaca sebagai binary data dari path: ' + String(item.json?.manifest_path || 'null'),\n      },\n      pairedItem: { item: i },\n    });\n    continue;\n  }\n\n  try {\n    const buffer = binaryData.data\n      ? Buffer.from(binaryData.data, 'base64')\n      : await this.helpers.getBinaryDataBuffer(i, 'data');\n    const text = buffer.toString('utf8').replace(/^\\uFEFF/, '');\n    output.push({\n      json: {\n        ...item.json,\n        manifest: JSON.parse(text),\n        manifest_binary_available: true,\n        manifest_read_error: null,\n      },\n      pairedItem: { item: i },\n    });\n  } catch (error) {\n    output.push({\n      json: {\n        ...item.json,\n        manifest: null,\n        manifest_binary_available: false,\n        manifest_read_error: 'Manifest JSON gagal dibaca: ' + (error.message || 'unknown error'),\n      },\n      pairedItem: { item: i },\n    });\n  }\n}\nreturn output;"
       },
       "id": "ff09441f-c668-4f89-90c8-b89fe93e4efe",
       "name": "Extract Manifest JSON",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -960,
         360
@@ -247,13 +234,12 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "/files/config/youtube_oauth.json",
-        "options": {}
+        "filePath": "/files/config/youtube_oauth.json",
+        "dataPropertyName": "data"
       },
       "id": "15dffed3-37e1-4aa8-80d4-43d6b5f749a4",
       "name": "Read YouTube Config File",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFile",
       "typeVersion": 1,
       "position": [
         -520,
@@ -273,7 +259,7 @@
       "id": "a97a57ff-ab51-45d1-b52e-e5737b52d78c",
       "name": "Merge YouTube Config Context",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
+      "typeVersion": 3.1,
       "position": [
         -300,
         360
@@ -296,19 +282,19 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "fileSelector": "={{ $json.clip_path_abs || '/files/__missing__/clip.mp4' }}",
-        "options": {}
+        "filePath": "={{ $json.clip_path_abs || '/files/__missing__/clip.mp4' }}",
+        "dataPropertyName": "data"
       },
       "id": "41bbf77d-f5ce-4dd0-8a97-a65236705f2c",
       "name": "Read Clip File",
-      "type": "n8n-nodes-base.readWriteFile",
+      "type": "n8n-nodes-base.readBinaryFile",
       "typeVersion": 1,
       "position": [
         140,
         260
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -322,7 +308,7 @@
       "id": "9b4240a8-3a5f-47c9-8584-e8da0bd48195",
       "name": "Merge Clip Context",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
+      "typeVersion": 3.1,
       "position": [
         360,
         360
@@ -332,7 +318,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "function buildFailure(message) {\n  return {\n    json: {\n      ...$json,\n      publish_upload_status: 'failed',\n      publish_error: message,\n      published_at: new Date().toISOString(),\n    }\n  };\n}\n\nfunction buildSuccess(extra) {\n  return {\n    json: {\n      ...$json,\n      publish_upload_status: 'uploaded',\n      publish_error: null,\n      published_at: new Date().toISOString(),\n      approval_bypassed: $json.approval_mode === 'required' ? Boolean($json.youtube_allow_publish_without_approval) : false,\n      ...extra,\n    }\n  };\n}\n\nfunction stringifyBody(value) {\n  if (typeof value === 'string') return value;\n  if (Buffer.isBuffer(value)) return value.toString('utf8');\n  if (value && typeof value === 'object') return JSON.stringify(value).slice(0, 4000);\n  return '';\n}\n\nfunction normalizeProcessingState(videoState) {\n  const rawProcessingStatus = String(videoState?.processingDetails?.processingStatus || '').trim().toLowerCase();\n  if (rawProcessingStatus) {\n    return {\n      normalized: rawProcessingStatus,\n      raw: rawProcessingStatus,\n      source: 'processingDetails.processingStatus',\n      isComplete: rawProcessingStatus === 'succeeded',\n      isTerminalFailure: ['failed', 'terminated'].includes(rawProcessingStatus),\n    };\n  }\n\n  const rawUploadStatus = String(videoState?.status?.uploadStatus || '').trim().toLowerCase();\n  if (rawUploadStatus === 'processed') {\n    return {\n      normalized: 'succeeded',\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: true,\n      isTerminalFailure: false,\n    };\n  }\n  if (['failed', 'rejected', 'deleted'].includes(rawUploadStatus)) {\n    return {\n      normalized: rawUploadStatus,\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: false,\n      isTerminalFailure: true,\n    };\n  }\n  if (rawUploadStatus === 'uploaded') {\n    return {\n      normalized: 'processing',\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: false,\n      isTerminalFailure: false,\n    };\n  }\n  if (rawUploadStatus) {\n    return {\n      normalized: rawUploadStatus,\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: false,\n      isTerminalFailure: false,\n    };\n  }\n\n  return {\n    normalized: 'unknown',\n    raw: null,\n    source: 'none',\n    isComplete: false,\n  };\n}\n\nfunction buildPendingSuccess(payload) {\n  return buildSuccess({\n    ...payload,\n    youtube_visibility_pending: true,\n  });\n}\n\nfunction sleep(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nconst configError = String($json.youtube_config_error || '').trim();\nif (configError) {\n  return buildFailure(configError);\n}\n\nif (!$json.youtube_client_id || !$json.youtube_client_secret || !$json.youtube_refresh_token) {\n  return buildFailure('Konfigurasi YouTube belum lengkap di /files/config/youtube_oauth.json.');\n}\n\nif ($json.approval_mode === 'required' && !$json.youtube_allow_publish_without_approval) {\n  return buildFailure('approval_mode masih required dan bypass publish dimatikan di config YouTube.');\n}\n\nlet title = String($json.title || '').trim();\nconst titleSuffix = String($json.youtube_title_suffix || '').trim();\nif (titleSuffix) {\n  title = [title, titleSuffix].filter(Boolean).join(' ').trim();\n}\nif (!title) {\n  title = ('Shorts ' + String($json.job_id || '')).trim();\n}\ntitle = title.slice(0, 100);\n\nlet description = String($json.description || '').trim();\nconst footer = String($json.youtube_description_footer || '').trim();\nif (footer) {\n  description = [description, footer].filter(Boolean).join('\\n\\n');\n}\ndescription = description.slice(0, 5000);\n\nconst hashtags = Array.isArray($json.hashtags)\n  ? $json.hashtags.map((tag) => String(tag || '').trim()).filter(Boolean)\n  : [];\nconst tags = hashtags.map((tag) => tag.replace(/^#/, '')).filter(Boolean).slice(0, 15);\nconst desiredVisibility = String($json.youtube_privacy_status || 'public');\nconst uploadVisibility = desiredVisibility;\nconst existingYoutubeResult = $json.existing_clip_youtube_result || $json.existing_youtube_result || {};\nconst existingVideoId = String(existingYoutubeResult.video_id || $json.youtube_video_id || '').trim();\nconst existingResultStatus = String(existingYoutubeResult.status || '').trim() || null;\nconst existingResultPublishedAt = String(existingYoutubeResult.published_at || '').trim() || null;\nconst statusCheckedAt = new Date().toISOString();\nconst processingWaitSeconds = Math.max(0, Number($json.youtube_processing_wait_seconds || 900));\nconst processingPollSeconds = Math.max(5, Number($json.youtube_processing_poll_seconds || 30));\nconst processingWaitMs = processingWaitSeconds * 1000;\nconst processingPollMs = processingPollSeconds * 1000;\n\nasync function getAccessToken() {\n  const tokenResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://oauth2.googleapis.com/token',\n    headers: {\n      'Content-Type': 'application/x-www-form-urlencoded',\n    },\n    body: [\n      'client_id=' + encodeURIComponent(String($json.youtube_client_id)),\n      'client_secret=' + encodeURIComponent(String($json.youtube_client_secret)),\n      'refresh_token=' + encodeURIComponent(String($json.youtube_refresh_token)),\n      'grant_type=refresh_token',\n    ].join('&'),\n    timeout: 120000,\n  });\n  return tokenResponse && tokenResponse.access_token ? String(tokenResponse.access_token) : '';\n}\n\nasync function getVideoState(accessToken, videoId) {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://www.googleapis.com/youtube/v3/videos',\n    qs: {\n      part: 'status,processingDetails,snippet,contentDetails,player',\n      id: videoId,\n    },\n    headers: {\n      Authorization: 'Bearer ' + accessToken,\n    },\n    timeout: 120000,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n\n  const statusCode = response?.statusCode || response?.status || 0;\n  if (statusCode >= 400) {\n    throw new Error('Gagal cek status video YouTube :: status=' + String(statusCode) + ' :: ' + stringifyBody(response?.body));\n  }\n\n  const body = response && Object.prototype.hasOwnProperty.call(response, 'body') ? response.body : response;\n  const parsed = typeof body === 'object' && body !== null && !Buffer.isBuffer(body)\n    ? body\n    : JSON.parse(stringifyBody(body) || '{}');\n  const item = Array.isArray(parsed.items) ? parsed.items[0] : null;\n  if (!item) {\n    throw new Error('Video YouTube dengan id ' + videoId + ' tidak ditemukan saat cek processing status.');\n  }\n  return item;\n}\n\nasync function updateVisibility(accessToken, videoId, videoState) {\n  const currentStatus = videoState && videoState.status ? videoState.status : {};\n  const currentPrivacy = String(currentStatus.privacyStatus || 'private');\n  if (currentPrivacy === desiredVisibility) {\n    return { privacyStatus: currentPrivacy, raw: videoState };\n  }\n\n  const response = await this.helpers.httpRequest({\n    method: 'PUT',\n    url: 'https://www.googleapis.com/youtube/v3/videos',\n    qs: {\n      part: 'status',\n    },\n    headers: {\n      Authorization: 'Bearer ' + accessToken,\n      'Content-Type': 'application/json; charset=UTF-8',\n    },\n    body: {\n      id: videoId,\n      status: {\n        privacyStatus: desiredVisibility,\n        selfDeclaredMadeForKids: Boolean($json.youtube_self_declared_made_for_kids),\n      },\n    },\n    timeout: 120000,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n\n  const statusCode = response?.statusCode || response?.status || 0;\n  if (statusCode >= 400) {\n    throw new Error('Gagal ubah visibility YouTube :: status=' + String(statusCode) + ' :: ' + stringifyBody(response?.body));\n  }\n\n  const body = response && Object.prototype.hasOwnProperty.call(response, 'body') ? response.body : response;\n  const parsed = typeof body === 'object' && body !== null && !Buffer.isBuffer(body)\n    ? body\n    : JSON.parse(stringifyBody(body) || '{}');\n  return {\n    privacyStatus: String(parsed?.status?.privacyStatus || desiredVisibility),\n    raw: parsed,\n  };\n}\n\nasync function waitForProcessingCompletion(accessToken, videoId, initialVideoState) {\n  let videoState = initialVideoState;\n  let processingState = normalizeProcessingState(videoState);\n  if (processingState.isComplete || processingState.isTerminalFailure || processingWaitMs <= 0) {\n    return { videoState, processingState, timedOut: false };\n  }\n\n  const startedAt = Date.now();\n  while (!processingState.isComplete && !processingState.isTerminalFailure && (Date.now() - startedAt) < processingWaitMs) {\n    await sleep(processingPollMs);\n    videoState = await getVideoState.call(this, accessToken, videoId);\n    processingState = normalizeProcessingState(videoState);\n  }\n\n  return {\n    videoState,\n    processingState,\n    timedOut: !processingState.isComplete && !processingState.isTerminalFailure,\n  };\n}\n\nasync function findReconciledVideo(accessToken) {\n  if (!accessToken) return null;\n  try {\n    const searchResponse = await this.helpers.httpRequest({\n      method: 'GET',\n      url: 'https://www.googleapis.com/youtube/v3/search',\n      qs: {\n        part: 'snippet',\n        forMine: 'true',\n        type: 'video',\n        maxResults: '10',\n        order: 'date',\n      },\n      headers: {\n        Authorization: 'Bearer ' + accessToken,\n      },\n      timeout: 120000,\n    });\n\n    const items = Array.isArray(searchResponse && searchResponse.items) ? searchResponse.items : [];\n    const now = Date.now();\n    const match = items.find((item) => {\n      const videoId = item && item.id ? item.id.videoId : null;\n      const snippet = item && item.snippet ? item.snippet : {};\n      const publishedAt = Date.parse(snippet.publishedAt || snippet.publishTime || '');\n      return Boolean(videoId)\n        && String(snippet.title || '').trim() === title\n        && String(snippet.description || '').trim() === description\n        && Number.isFinite(publishedAt)\n        && Math.abs(now - publishedAt) <= 30 * 60 * 1000;\n    });\n\n    if (!match || !match.id || !match.id.videoId) {\n      return null;\n    }\n\n    return {\n      youtube_video_id: String(match.id.videoId),\n      youtube_watch_url: 'https://www.youtube.com/watch?v=' + String(match.id.videoId),\n      youtube_shorts_url: 'https://www.youtube.com/shorts/' + String(match.id.videoId),\n      youtube_studio_url: 'https://studio.youtube.com/video/' + String(match.id.videoId) + '/edit',\n      youtube_uploaded_title: title,\n      youtube_uploaded_description: description,\n      youtube_uploaded_hashtags: hashtags,\n      youtube_uploaded_tags: tags,\n      youtube_privacy_status_effective: uploadVisibility,\n      youtube_target_visibility: desiredVisibility,\n      youtube_processing_status: 'processing',\n      youtube_processing_status_raw: 'processing',\n      youtube_processing_status_source: 'channel.search.reconciliation',\n      youtube_visibility_pending: true,\n      youtube_publish_mode: 'reconcile_recent_channel_search',\n      youtube_status_context: 'upload_reconciled_from_channel_search',\n      youtube_status_checked_at: statusCheckedAt,\n      youtube_processing_wait_seconds: processingWaitSeconds,\n      youtube_existing_result_status: existingResultStatus,\n      youtube_existing_result_published_at: existingResultPublishedAt,\n      youtube_api_response: {\n        reconciled: true,\n        search_match: match,\n      },\n    };\n  } catch (reconcileError) {\n    return null;\n  }\n}\n\nlet accessToken = '';\n\ntry {\n  accessToken = await getAccessToken.call(this);\n  if (!accessToken) {\n    return buildFailure('Google OAuth tidak mengembalikan access_token.');\n  }\n\n  if (existingVideoId) {\n    let videoState = await getVideoState.call(this, accessToken, existingVideoId);\n    let processingState = normalizeProcessingState(videoState);\n    if (processingState.isTerminalFailure) {\n      return buildFailure('YouTube menandai video existing gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n    }\n    let currentPrivacy = String(videoState?.status?.privacyStatus || 'private');\n\n    if (currentPrivacy !== desiredVisibility) {\n      const earlyVisibilityUpdate = await updateVisibility.call(this, accessToken, existingVideoId, videoState);\n      currentPrivacy = String(earlyVisibilityUpdate.privacyStatus || desiredVisibility);\n      videoState = await getVideoState.call(this, accessToken, existingVideoId);\n      processingState = normalizeProcessingState(videoState);\n    }\n\n    if (!processingState.isComplete) {\n      const waited = await waitForProcessingCompletion.call(this, accessToken, existingVideoId, videoState);\n      videoState = waited.videoState;\n      processingState = waited.processingState;\n      currentPrivacy = String(videoState?.status?.privacyStatus || currentPrivacy || desiredVisibility);\n\n      if (processingState.isTerminalFailure) {\n        return buildFailure('YouTube menandai video existing gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n      }\n\n      if (!processingState.isComplete) {\n        return buildPendingSuccess({\n          youtube_video_id: existingVideoId,\n          youtube_watch_url: 'https://www.youtube.com/watch?v=' + existingVideoId,\n          youtube_shorts_url: 'https://www.youtube.com/shorts/' + existingVideoId,\n          youtube_studio_url: 'https://studio.youtube.com/video/' + existingVideoId + '/edit',\n          youtube_uploaded_title: String(videoState?.snippet?.title || title),\n          youtube_uploaded_description: String(videoState?.snippet?.description || description),\n          youtube_uploaded_hashtags: hashtags,\n          youtube_uploaded_tags: tags,\n          youtube_privacy_status_effective: currentPrivacy,\n          youtube_target_visibility: desiredVisibility,\n          youtube_processing_status: processingState.normalized,\n          youtube_processing_status_raw: processingState.raw,\n          youtube_processing_status_source: processingState.source,\n          youtube_publish_mode: 'reconcile_existing_video',\n          youtube_status_context: waited.timedOut ? 'processing_wait_timeout_existing_video' : 'processing_pending_recheck',\n          youtube_status_checked_at: new Date().toISOString(),\n          youtube_processing_wait_seconds: processingWaitSeconds,\n          youtube_existing_result_status: existingResultStatus,\n          youtube_existing_result_published_at: existingResultPublishedAt,\n          youtube_api_response: videoState,\n        });\n      }\n    }\n\n    const visibilityUpdate = await updateVisibility.call(this, accessToken, existingVideoId, videoState);\n    return buildSuccess({\n      youtube_video_id: existingVideoId,\n      youtube_watch_url: 'https://www.youtube.com/watch?v=' + existingVideoId,\n      youtube_shorts_url: 'https://www.youtube.com/shorts/' + existingVideoId,\n      youtube_studio_url: 'https://studio.youtube.com/video/' + existingVideoId + '/edit',\n      youtube_uploaded_title: String(videoState?.snippet?.title || title),\n      youtube_uploaded_description: String(videoState?.snippet?.description || description),\n      youtube_uploaded_hashtags: hashtags,\n      youtube_uploaded_tags: tags,\n      youtube_privacy_status_effective: visibilityUpdate.privacyStatus,\n      youtube_target_visibility: desiredVisibility,\n      youtube_processing_status: 'succeeded',\n      youtube_processing_status_raw: processingState.raw,\n      youtube_processing_status_source: processingState.source,\n      youtube_visibility_pending: false,\n      youtube_publish_mode: 'reconcile_existing_video',\n      youtube_status_context: 'video_processed_and_visibility_synced',\n      youtube_status_checked_at: new Date().toISOString(),\n      youtube_processing_wait_seconds: processingWaitSeconds,\n      youtube_existing_result_status: existingResultStatus,\n      youtube_existing_result_published_at: existingResultPublishedAt,\n      youtube_api_response: visibilityUpdate.raw,\n    });\n  }\n\n  const binaryFieldName = $binary ? Object.keys($binary)[0] : null;\n  if (!binaryFieldName) {\n    return buildFailure('File clip utama tidak terbaca sebagai binary data.');\n  }\n\n  const clipBuffer = await this.helpers.getBinaryDataBuffer(0, binaryFieldName);\n  const mimeType = String(($binary[binaryFieldName] && $binary[binaryFieldName].mimeType) || 'video/mp4');\n\n  const metadata = {\n    snippet: {\n      title,\n      description,\n      categoryId: String($json.youtube_category_id || '22'),\n    },\n    status: {\n      privacyStatus: uploadVisibility,\n      selfDeclaredMadeForKids: Boolean($json.youtube_self_declared_made_for_kids),\n    },\n  };\n\n  if (tags.length > 0) {\n    metadata.snippet.tags = tags;\n  }\n\n  const initResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://www.googleapis.com/upload/youtube/v3/videos',\n    qs: {\n      uploadType: 'resumable',\n      part: 'snippet,status',\n      notifySubscribers: $json.youtube_notify_subscribers ? 'true' : 'false',\n    },\n    headers: {\n      Authorization: 'Bearer ' + accessToken,\n      'Content-Type': 'application/json; charset=UTF-8',\n      'X-Upload-Content-Length': String(clipBuffer.length),\n      'X-Upload-Content-Type': mimeType,\n    },\n    body: metadata,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n  });\n\n  const initStatus = initResponse?.statusCode || initResponse?.status || 0;\n  if (initStatus >= 400) {\n    return buildFailure('Init upload YouTube gagal :: status=' + String(initStatus) + ' :: ' + stringifyBody(initResponse?.body));\n  }\n\n  const location = initResponse && initResponse.headers\n    ? String(initResponse.headers.location || initResponse.headers.Location || '')\n    : '';\n\n  if (!location) {\n    return buildFailure('Google tidak mengembalikan upload location untuk resumable upload.');\n  }\n\n  const uploadResponseRaw = await this.helpers.httpRequest({\n    method: 'PUT',\n    url: location,\n    headers: {\n      'Content-Type': mimeType,\n    },\n    body: clipBuffer,\n    timeout: 300000,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n  });\n\n  const uploadStatus = uploadResponseRaw?.statusCode || uploadResponseRaw?.status || 0;\n  const uploadBody = uploadResponseRaw && Object.prototype.hasOwnProperty.call(uploadResponseRaw, 'body')\n    ? uploadResponseRaw.body\n    : uploadResponseRaw;\n  const uploadBodyText = stringifyBody(uploadBody);\n\n  if (uploadStatus >= 400) {\n    const reconciled = await findReconciledVideo.call(this, accessToken);\n    if (reconciled) {\n      return buildSuccess(reconciled);\n    }\n    return buildFailure('Upload chunk YouTube gagal :: status=' + String(uploadStatus) + ' :: ' + uploadBodyText);\n  }\n\n  const uploadResponse = typeof uploadBody === 'object' && uploadBody !== null && !Buffer.isBuffer(uploadBody)\n    ? uploadBody\n    : JSON.parse(uploadBodyText || '{}');\n\n  const videoId = uploadResponse && uploadResponse.id ? String(uploadResponse.id) : '';\n  if (!videoId) {\n    const reconciled = await findReconciledVideo.call(this, accessToken);\n    if (reconciled) {\n      return buildSuccess(reconciled);\n    }\n    return buildFailure('Upload YouTube selesai tapi video id tidak ditemukan di respons API. Respons: ' + uploadBodyText.slice(0, 1000));\n  }\n\n  let videoState = await getVideoState.call(this, accessToken, videoId);\n  let processingState = normalizeProcessingState(videoState);\n  if (processingState.isTerminalFailure) {\n    return buildFailure('YouTube menandai upload gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n  }\n  let currentPrivacy = String(videoState?.status?.privacyStatus || uploadVisibility);\n\n  if (!processingState.isComplete) {\n    const waited = await waitForProcessingCompletion.call(this, accessToken, videoId, videoState);\n    videoState = waited.videoState;\n    processingState = waited.processingState;\n    currentPrivacy = String(videoState?.status?.privacyStatus || currentPrivacy || uploadVisibility);\n\n    if (processingState.isTerminalFailure) {\n      return buildFailure('YouTube menandai upload gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n    }\n\n    if (!processingState.isComplete) {\n      return buildPendingSuccess({\n        youtube_video_id: videoId,\n        youtube_watch_url: 'https://www.youtube.com/watch?v=' + videoId,\n        youtube_shorts_url: 'https://www.youtube.com/shorts/' + videoId,\n        youtube_studio_url: 'https://studio.youtube.com/video/' + videoId + '/edit',\n        youtube_uploaded_title: title,\n        youtube_uploaded_description: description,\n        youtube_uploaded_hashtags: hashtags,\n        youtube_uploaded_tags: tags,\n        youtube_privacy_status_effective: currentPrivacy,\n        youtube_target_visibility: desiredVisibility,\n        youtube_processing_status: processingState.normalized,\n        youtube_processing_status_raw: processingState.raw,\n        youtube_processing_status_source: processingState.source,\n        youtube_publish_mode: 'new_upload',\n        youtube_status_context: waited.timedOut ? 'processing_wait_timeout_new_upload' : 'upload_accepted_waiting_processing',\n        youtube_status_checked_at: new Date().toISOString(),\n        youtube_processing_wait_seconds: processingWaitSeconds,\n        youtube_existing_result_status: existingResultStatus,\n        youtube_existing_result_published_at: existingResultPublishedAt,\n        youtube_api_response: videoState,\n      });\n    }\n  }\n\n  const visibilityUpdate = await updateVisibility.call(this, accessToken, videoId, videoState);\n  return buildSuccess({\n    youtube_video_id: videoId,\n    youtube_watch_url: 'https://www.youtube.com/watch?v=' + videoId,\n    youtube_shorts_url: 'https://www.youtube.com/shorts/' + videoId,\n    youtube_studio_url: 'https://studio.youtube.com/video/' + videoId + '/edit',\n    youtube_uploaded_title: title,\n    youtube_uploaded_description: description,\n    youtube_uploaded_hashtags: hashtags,\n    youtube_uploaded_tags: tags,\n    youtube_privacy_status_effective: visibilityUpdate.privacyStatus,\n    youtube_target_visibility: desiredVisibility,\n    youtube_processing_status: 'succeeded',\n    youtube_processing_status_raw: processingState.raw,\n    youtube_processing_status_source: processingState.source,\n    youtube_visibility_pending: false,\n    youtube_publish_mode: 'new_upload',\n    youtube_status_context: 'upload_completed_and_visibility_synced',\n    youtube_status_checked_at: new Date().toISOString(),\n    youtube_processing_wait_seconds: processingWaitSeconds,\n    youtube_existing_result_status: existingResultStatus,\n    youtube_existing_result_published_at: existingResultPublishedAt,\n    youtube_api_response: visibilityUpdate.raw,\n  });\n} catch (error) {\n  const reconciled = await findReconciledVideo.call(this, accessToken);\n  if (reconciled) {\n    return buildSuccess(reconciled);\n  }\n\n  const responseBody = error?.response?.body ?? error?.response?.data ?? error?.context ?? error?.cause ?? null;\n  const responseText = stringifyBody(responseBody);\n  const statusCode = error?.statusCode || error?.response?.statusCode || error?.response?.status || null;\n  const parts = [];\n  if (error?.message) parts.push(String(error.message));\n  if (statusCode) parts.push('status=' + String(statusCode));\n  if (responseText) parts.push(responseText);\n  return buildFailure(parts.join(' :: ') || 'Gagal upload ke YouTube Data API.');\n}"
+        "jsCode": "function buildFailure(message) {\n  return {\n    json: {\n      ...$json,\n      publish_upload_status: 'failed',\n      publish_error: message,\n      published_at: new Date().toISOString(),\n    }\n  };\n}\n\nfunction buildSuccess(extra) {\n  return {\n    json: {\n      ...$json,\n      publish_upload_status: 'uploaded',\n      publish_error: null,\n      published_at: new Date().toISOString(),\n      approval_bypassed: $json.approval_mode === 'required' ? Boolean($json.youtube_allow_publish_without_approval) : false,\n      ...extra,\n    }\n  };\n}\n\nfunction stringifyBody(value) {\n  if (typeof value === 'string') return value;\n  if (Buffer.isBuffer(value)) return value.toString('utf8');\n  if (value && typeof value === 'object') return JSON.stringify(value).slice(0, 4000);\n  return '';\n}\n\nfunction normalizeProcessingState(videoState) {\n  const rawProcessingStatus = String(videoState?.processingDetails?.processingStatus || '').trim().toLowerCase();\n  if (rawProcessingStatus) {\n    return {\n      normalized: rawProcessingStatus,\n      raw: rawProcessingStatus,\n      source: 'processingDetails.processingStatus',\n      isComplete: rawProcessingStatus === 'succeeded',\n      isTerminalFailure: ['failed', 'terminated'].includes(rawProcessingStatus),\n    };\n  }\n\n  const rawUploadStatus = String(videoState?.status?.uploadStatus || '').trim().toLowerCase();\n  if (rawUploadStatus === 'processed') {\n    return {\n      normalized: 'succeeded',\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: true,\n      isTerminalFailure: false,\n    };\n  }\n  if (['failed', 'rejected', 'deleted'].includes(rawUploadStatus)) {\n    return {\n      normalized: rawUploadStatus,\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: false,\n      isTerminalFailure: true,\n    };\n  }\n  if (rawUploadStatus === 'uploaded') {\n    return {\n      normalized: 'processing',\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: false,\n      isTerminalFailure: false,\n    };\n  }\n  if (rawUploadStatus) {\n    return {\n      normalized: rawUploadStatus,\n      raw: rawUploadStatus,\n      source: 'status.uploadStatus',\n      isComplete: false,\n      isTerminalFailure: false,\n    };\n  }\n\n  return {\n    normalized: 'unknown',\n    raw: null,\n    source: 'none',\n    isComplete: false,\n  };\n}\n\nfunction buildPendingSuccess(payload) {\n  return buildSuccess({\n    ...payload,\n    youtube_visibility_pending: true,\n  });\n}\n\nfunction sleep(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nconst configError = String($json.youtube_config_error || '').trim();\nif (configError) {\n  return buildFailure(configError);\n}\n\nif (!$json.youtube_client_id || !$json.youtube_client_secret || !$json.youtube_refresh_token) {\n  return buildFailure('Konfigurasi YouTube belum lengkap di /files/config/youtube_oauth.json.');\n}\n\nif ($json.approval_mode === 'required' && !$json.youtube_allow_publish_without_approval) {\n  return buildFailure('approval_mode masih required dan bypass publish dimatikan di config YouTube.');\n}\n\nlet title = String($json.title || '').trim();\nconst titleSuffix = String($json.youtube_title_suffix || '').trim();\nif (titleSuffix) {\n  title = [title, titleSuffix].filter(Boolean).join(' ').trim();\n}\nif (!title) {\n  title = ('Shorts ' + String($json.job_id || '')).trim();\n}\ntitle = title.slice(0, 100);\n\nlet description = String($json.description || '').trim();\nconst footer = String($json.youtube_description_footer || '').trim();\nif (footer) {\n  description = [description, footer].filter(Boolean).join('\\n\\n');\n}\ndescription = description.slice(0, 5000);\n\nconst hashtags = Array.isArray($json.hashtags)\n  ? $json.hashtags.map((tag) => String(tag || '').trim()).filter(Boolean)\n  : [];\nconst tags = hashtags.map((tag) => tag.replace(/^#/, '')).filter(Boolean).slice(0, 15);\nconst desiredVisibility = String($json.youtube_privacy_status || 'public');\nconst uploadVisibility = desiredVisibility;\nconst existingYoutubeResult = $json.existing_clip_youtube_result || $json.existing_youtube_result || {};\nconst existingVideoId = String(existingYoutubeResult.video_id || $json.youtube_video_id || '').trim();\nconst existingResultStatus = String(existingYoutubeResult.status || '').trim() || null;\nconst existingResultPublishedAt = String(existingYoutubeResult.published_at || '').trim() || null;\nconst statusCheckedAt = new Date().toISOString();\nconst processingWaitSeconds = Math.max(0, Number($json.youtube_processing_wait_seconds || 900));\nconst processingPollSeconds = Math.max(5, Number($json.youtube_processing_poll_seconds || 30));\nconst processingWaitMs = processingWaitSeconds * 1000;\nconst processingPollMs = processingPollSeconds * 1000;\n\nasync function getAccessToken() {\n  const tokenResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://oauth2.googleapis.com/token',\n    headers: {\n      'Content-Type': 'application/x-www-form-urlencoded',\n    },\n    body: [\n      'client_id=' + encodeURIComponent(String($json.youtube_client_id)),\n      'client_secret=' + encodeURIComponent(String($json.youtube_client_secret)),\n      'refresh_token=' + encodeURIComponent(String($json.youtube_refresh_token)),\n      'grant_type=refresh_token',\n    ].join('&'),\n    timeout: 120000,\n  });\n  return tokenResponse && tokenResponse.access_token ? String(tokenResponse.access_token) : '';\n}\n\nasync function getVideoState(accessToken, videoId) {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://www.googleapis.com/youtube/v3/videos',\n    qs: {\n      part: 'status,processingDetails,snippet,contentDetails,player',\n      id: videoId,\n    },\n    headers: {\n      Authorization: 'Bearer ' + accessToken,\n    },\n    timeout: 120000,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n\n  const statusCode = response?.statusCode || response?.status || 0;\n  if (statusCode >= 400) {\n    throw new Error('Gagal cek status video YouTube :: status=' + String(statusCode) + ' :: ' + stringifyBody(response?.body));\n  }\n\n  const body = response && Object.prototype.hasOwnProperty.call(response, 'body') ? response.body : response;\n  const parsed = typeof body === 'object' && body !== null && !Buffer.isBuffer(body)\n    ? body\n    : JSON.parse(stringifyBody(body) || '{}');\n  const item = Array.isArray(parsed.items) ? parsed.items[0] : null;\n  if (!item) {\n    throw new Error('Video YouTube dengan id ' + videoId + ' tidak ditemukan saat cek processing status.');\n  }\n  return item;\n}\n\nasync function updateVisibility(accessToken, videoId, videoState) {\n  const currentStatus = videoState && videoState.status ? videoState.status : {};\n  const currentPrivacy = String(currentStatus.privacyStatus || 'private');\n  if (currentPrivacy === desiredVisibility) {\n    return { privacyStatus: currentPrivacy, raw: videoState };\n  }\n\n  const response = await this.helpers.httpRequest({\n    method: 'PUT',\n    url: 'https://www.googleapis.com/youtube/v3/videos',\n    qs: {\n      part: 'status',\n    },\n    headers: {\n      Authorization: 'Bearer ' + accessToken,\n      'Content-Type': 'application/json; charset=UTF-8',\n    },\n    body: {\n      id: videoId,\n      status: {\n        privacyStatus: desiredVisibility,\n        selfDeclaredMadeForKids: Boolean($json.youtube_self_declared_made_for_kids),\n      },\n    },\n    timeout: 120000,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n\n  const statusCode = response?.statusCode || response?.status || 0;\n  if (statusCode >= 400) {\n    throw new Error('Gagal ubah visibility YouTube :: status=' + String(statusCode) + ' :: ' + stringifyBody(response?.body));\n  }\n\n  const body = response && Object.prototype.hasOwnProperty.call(response, 'body') ? response.body : response;\n  const parsed = typeof body === 'object' && body !== null && !Buffer.isBuffer(body)\n    ? body\n    : JSON.parse(stringifyBody(body) || '{}');\n  return {\n    privacyStatus: String(parsed?.status?.privacyStatus || desiredVisibility),\n    raw: parsed,\n  };\n}\n\nasync function waitForProcessingCompletion(accessToken, videoId, initialVideoState) {\n  let videoState = initialVideoState;\n  let processingState = normalizeProcessingState(videoState);\n  if (processingState.isComplete || processingState.isTerminalFailure || processingWaitMs <= 0) {\n    return { videoState, processingState, timedOut: false };\n  }\n\n  const startedAt = Date.now();\n  while (!processingState.isComplete && !processingState.isTerminalFailure && (Date.now() - startedAt) < processingWaitMs) {\n    await sleep(processingPollMs);\n    videoState = await getVideoState.call(this, accessToken, videoId);\n    processingState = normalizeProcessingState(videoState);\n  }\n\n  return {\n    videoState,\n    processingState,\n    timedOut: !processingState.isComplete && !processingState.isTerminalFailure,\n  };\n}\n\nasync function findReconciledVideo(accessToken) {\n  if (!accessToken) return null;\n  try {\n    const searchResponse = await this.helpers.httpRequest({\n      method: 'GET',\n      url: 'https://www.googleapis.com/youtube/v3/search',\n      qs: {\n        part: 'snippet',\n        forMine: 'true',\n        type: 'video',\n        maxResults: '10',\n        order: 'date',\n      },\n      headers: {\n        Authorization: 'Bearer ' + accessToken,\n      },\n      timeout: 120000,\n    });\n\n    const items = Array.isArray(searchResponse && searchResponse.items) ? searchResponse.items : [];\n    const now = Date.now();\n    const match = items.find((item) => {\n      const videoId = item && item.id ? item.id.videoId : null;\n      const snippet = item && item.snippet ? item.snippet : {};\n      const publishedAt = Date.parse(snippet.publishedAt || snippet.publishTime || '');\n      return Boolean(videoId)\n        && String(snippet.title || '').trim() === title\n        && String(snippet.description || '').trim() === description\n        && Number.isFinite(publishedAt)\n        && Math.abs(now - publishedAt) <= 30 * 60 * 1000;\n    });\n\n    if (!match || !match.id || !match.id.videoId) {\n      return null;\n    }\n\n    return {\n      youtube_video_id: String(match.id.videoId),\n      youtube_watch_url: 'https://www.youtube.com/watch?v=' + String(match.id.videoId),\n      youtube_shorts_url: 'https://www.youtube.com/shorts/' + String(match.id.videoId),\n      youtube_studio_url: 'https://studio.youtube.com/video/' + String(match.id.videoId) + '/edit',\n      youtube_uploaded_title: title,\n      youtube_uploaded_description: description,\n      youtube_uploaded_hashtags: hashtags,\n      youtube_uploaded_tags: tags,\n      youtube_privacy_status_effective: uploadVisibility,\n      youtube_target_visibility: desiredVisibility,\n      youtube_processing_status: 'processing',\n      youtube_processing_status_raw: 'processing',\n      youtube_processing_status_source: 'channel.search.reconciliation',\n      youtube_visibility_pending: true,\n      youtube_publish_mode: 'reconcile_recent_channel_search',\n      youtube_status_context: 'upload_reconciled_from_channel_search',\n      youtube_status_checked_at: statusCheckedAt,\n      youtube_processing_wait_seconds: processingWaitSeconds,\n      youtube_existing_result_status: existingResultStatus,\n      youtube_existing_result_published_at: existingResultPublishedAt,\n      youtube_api_response: {\n        reconciled: true,\n        search_match: match,\n      },\n    };\n  } catch (reconcileError) {\n    return null;\n  }\n}\n\nlet accessToken = '';\n\ntry {\n  accessToken = await getAccessToken.call(this);\n  if (!accessToken) {\n    return buildFailure('Google OAuth tidak mengembalikan access_token.');\n  }\n\n  if (existingVideoId) {\n    let videoState = await getVideoState.call(this, accessToken, existingVideoId);\n    let processingState = normalizeProcessingState(videoState);\n    if (processingState.isTerminalFailure) {\n      return buildFailure('YouTube menandai video existing gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n    }\n    let currentPrivacy = String(videoState?.status?.privacyStatus || 'private');\n\n    if (currentPrivacy !== desiredVisibility) {\n      const earlyVisibilityUpdate = await updateVisibility.call(this, accessToken, existingVideoId, videoState);\n      currentPrivacy = String(earlyVisibilityUpdate.privacyStatus || desiredVisibility);\n      videoState = await getVideoState.call(this, accessToken, existingVideoId);\n      processingState = normalizeProcessingState(videoState);\n    }\n\n    if (!processingState.isComplete) {\n      const waited = await waitForProcessingCompletion.call(this, accessToken, existingVideoId, videoState);\n      videoState = waited.videoState;\n      processingState = waited.processingState;\n      currentPrivacy = String(videoState?.status?.privacyStatus || currentPrivacy || desiredVisibility);\n\n      if (processingState.isTerminalFailure) {\n        return buildFailure('YouTube menandai video existing gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n      }\n\n      if (!processingState.isComplete) {\n        return buildPendingSuccess({\n          youtube_video_id: existingVideoId,\n          youtube_watch_url: 'https://www.youtube.com/watch?v=' + existingVideoId,\n          youtube_shorts_url: 'https://www.youtube.com/shorts/' + existingVideoId,\n          youtube_studio_url: 'https://studio.youtube.com/video/' + existingVideoId + '/edit',\n          youtube_uploaded_title: String(videoState?.snippet?.title || title),\n          youtube_uploaded_description: String(videoState?.snippet?.description || description),\n          youtube_uploaded_hashtags: hashtags,\n          youtube_uploaded_tags: tags,\n          youtube_privacy_status_effective: currentPrivacy,\n          youtube_target_visibility: desiredVisibility,\n          youtube_processing_status: processingState.normalized,\n          youtube_processing_status_raw: processingState.raw,\n          youtube_processing_status_source: processingState.source,\n          youtube_publish_mode: 'reconcile_existing_video',\n          youtube_status_context: waited.timedOut ? 'processing_wait_timeout_existing_video' : 'processing_pending_recheck',\n          youtube_status_checked_at: new Date().toISOString(),\n          youtube_processing_wait_seconds: processingWaitSeconds,\n          youtube_existing_result_status: existingResultStatus,\n          youtube_existing_result_published_at: existingResultPublishedAt,\n          youtube_api_response: videoState,\n        });\n      }\n    }\n\n    const visibilityUpdate = await updateVisibility.call(this, accessToken, existingVideoId, videoState);\n    return buildSuccess({\n      youtube_video_id: existingVideoId,\n      youtube_watch_url: 'https://www.youtube.com/watch?v=' + existingVideoId,\n      youtube_shorts_url: 'https://www.youtube.com/shorts/' + existingVideoId,\n      youtube_studio_url: 'https://studio.youtube.com/video/' + existingVideoId + '/edit',\n      youtube_uploaded_title: String(videoState?.snippet?.title || title),\n      youtube_uploaded_description: String(videoState?.snippet?.description || description),\n      youtube_uploaded_hashtags: hashtags,\n      youtube_uploaded_tags: tags,\n      youtube_privacy_status_effective: visibilityUpdate.privacyStatus,\n      youtube_target_visibility: desiredVisibility,\n      youtube_processing_status: 'succeeded',\n      youtube_processing_status_raw: processingState.raw,\n      youtube_processing_status_source: processingState.source,\n      youtube_visibility_pending: false,\n      youtube_publish_mode: 'reconcile_existing_video',\n      youtube_status_context: 'video_processed_and_visibility_synced',\n      youtube_status_checked_at: new Date().toISOString(),\n      youtube_processing_wait_seconds: processingWaitSeconds,\n      youtube_existing_result_status: existingResultStatus,\n      youtube_existing_result_published_at: existingResultPublishedAt,\n      youtube_api_response: visibilityUpdate.raw,\n    });\n  }\n\n  const binaryFieldName = $binary ? Object.keys($binary)[0] : null;\n  if (!binaryFieldName) {\n    return buildFailure('File clip utama tidak terbaca sebagai binary data.');\n  }\n\n  const clipBuffer = await this.helpers.getBinaryDataBuffer(0, binaryFieldName);\n  const mimeType = String(($binary[binaryFieldName] && $binary[binaryFieldName].mimeType) || 'video/mp4');\n\n  const metadata = {\n    snippet: {\n      title,\n      description,\n      categoryId: String($json.youtube_category_id || '22'),\n    },\n    status: {\n      privacyStatus: uploadVisibility,\n      selfDeclaredMadeForKids: Boolean($json.youtube_self_declared_made_for_kids),\n    },\n  };\n\n  if (tags.length > 0) {\n    metadata.snippet.tags = tags;\n  }\n\n  const initResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://www.googleapis.com/upload/youtube/v3/videos',\n    qs: {\n      uploadType: 'resumable',\n      part: 'snippet,status',\n      notifySubscribers: $json.youtube_notify_subscribers ? 'true' : 'false',\n    },\n    headers: {\n      Authorization: 'Bearer ' + accessToken,\n      'Content-Type': 'application/json; charset=UTF-8',\n      'X-Upload-Content-Length': String(clipBuffer.length),\n      'X-Upload-Content-Type': mimeType,\n    },\n    body: metadata,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n  });\n\n  const initStatus = initResponse?.statusCode || initResponse?.status || 0;\n  if (initStatus >= 400) {\n    return buildFailure('Init upload YouTube gagal :: status=' + String(initStatus) + ' :: ' + stringifyBody(initResponse?.body));\n  }\n\n  const location = initResponse && initResponse.headers\n    ? String(initResponse.headers.location || initResponse.headers.Location || '')\n    : '';\n\n  if (!location) {\n    return buildFailure('Google tidak mengembalikan upload location untuk resumable upload.');\n  }\n\n  const uploadResponseRaw = await this.helpers.httpRequest({\n    method: 'PUT',\n    url: location,\n    headers: {\n      'Content-Type': mimeType,\n    },\n    body: clipBuffer,\n    timeout: 300000,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n  });\n\n  const uploadStatus = uploadResponseRaw?.statusCode || uploadResponseRaw?.status || 0;\n  const uploadBody = uploadResponseRaw && Object.prototype.hasOwnProperty.call(uploadResponseRaw, 'body')\n    ? uploadResponseRaw.body\n    : uploadResponseRaw;\n  const uploadBodyText = stringifyBody(uploadBody);\n\n  if (uploadStatus >= 400) {\n    const reconciled = await findReconciledVideo.call(this, accessToken);\n    if (reconciled) {\n      return buildSuccess(reconciled);\n    }\n    return buildFailure('Upload chunk YouTube gagal :: status=' + String(uploadStatus) + ' :: ' + uploadBodyText);\n  }\n\n  const uploadResponse = typeof uploadBody === 'object' && uploadBody !== null && !Buffer.isBuffer(uploadBody)\n    ? uploadBody\n    : JSON.parse(uploadBodyText || '{}');\n\n  const videoId = uploadResponse && uploadResponse.id ? String(uploadResponse.id) : '';\n  if (!videoId) {\n    const reconciled = await findReconciledVideo.call(this, accessToken);\n    if (reconciled) {\n      return buildSuccess(reconciled);\n    }\n    return buildFailure('Upload YouTube selesai tapi video id tidak ditemukan di respons API. Respons: ' + uploadBodyText.slice(0, 1000));\n  }\n\n  let videoState;\n  let processingState;\n  let currentPrivacy = uploadVisibility;\n  try {\n    videoState = await getVideoState.call(this, accessToken, videoId);\n    processingState = normalizeProcessingState(videoState);\n    if (processingState.isTerminalFailure) {\n      return buildFailure('YouTube menandai upload gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n    }\n    currentPrivacy = String(videoState?.status?.privacyStatus || uploadVisibility);\n  } catch (statusError) {\n    return buildPendingSuccess({\n      youtube_video_id: videoId,\n      youtube_watch_url: 'https://www.youtube.com/watch?v=' + videoId,\n      youtube_shorts_url: 'https://www.youtube.com/shorts/' + videoId,\n      youtube_studio_url: 'https://studio.youtube.com/video/' + videoId + '/edit',\n      youtube_uploaded_title: title,\n      youtube_uploaded_description: description,\n      youtube_uploaded_hashtags: hashtags,\n      youtube_uploaded_tags: tags,\n      youtube_privacy_status_effective: uploadVisibility,\n      youtube_target_visibility: desiredVisibility,\n      youtube_processing_status: 'unknown',\n      youtube_processing_status_raw: null,\n      youtube_processing_status_source: 'status_check_failed_after_upload',\n      youtube_publish_mode: 'new_upload',\n      youtube_status_context: 'upload_completed_status_check_failed',\n      youtube_status_checked_at: new Date().toISOString(),\n      youtube_processing_wait_seconds: processingWaitSeconds,\n      youtube_existing_result_status: existingResultStatus,\n      youtube_existing_result_published_at: existingResultPublishedAt,\n      youtube_status_check_error: statusError.message || 'Gagal cek status video setelah upload.',\n      youtube_api_response: uploadResponse,\n    });\n  }\n\n  if (!processingState.isComplete) {\n    const waited = await waitForProcessingCompletion.call(this, accessToken, videoId, videoState);\n    videoState = waited.videoState;\n    processingState = waited.processingState;\n    currentPrivacy = String(videoState?.status?.privacyStatus || currentPrivacy || uploadVisibility);\n\n    if (processingState.isTerminalFailure) {\n      return buildFailure('YouTube menandai upload gagal/ditolak :: status=' + processingState.normalized + ' :: failure=' + String(videoState?.status?.failureReason || videoState?.status?.rejectionReason || videoState?.processingDetails?.processingFailureReason || 'unknown'));\n    }\n\n    if (!processingState.isComplete) {\n      return buildPendingSuccess({\n        youtube_video_id: videoId,\n        youtube_watch_url: 'https://www.youtube.com/watch?v=' + videoId,\n        youtube_shorts_url: 'https://www.youtube.com/shorts/' + videoId,\n        youtube_studio_url: 'https://studio.youtube.com/video/' + videoId + '/edit',\n        youtube_uploaded_title: title,\n        youtube_uploaded_description: description,\n        youtube_uploaded_hashtags: hashtags,\n        youtube_uploaded_tags: tags,\n        youtube_privacy_status_effective: currentPrivacy,\n        youtube_target_visibility: desiredVisibility,\n        youtube_processing_status: processingState.normalized,\n        youtube_processing_status_raw: processingState.raw,\n        youtube_processing_status_source: processingState.source,\n        youtube_publish_mode: 'new_upload',\n        youtube_status_context: waited.timedOut ? 'processing_wait_timeout_new_upload' : 'upload_accepted_waiting_processing',\n        youtube_status_checked_at: new Date().toISOString(),\n        youtube_processing_wait_seconds: processingWaitSeconds,\n        youtube_existing_result_status: existingResultStatus,\n        youtube_existing_result_published_at: existingResultPublishedAt,\n        youtube_api_response: videoState,\n      });\n    }\n  }\n\n  const visibilityUpdate = await updateVisibility.call(this, accessToken, videoId, videoState);\n  return buildSuccess({\n    youtube_video_id: videoId,\n    youtube_watch_url: 'https://www.youtube.com/watch?v=' + videoId,\n    youtube_shorts_url: 'https://www.youtube.com/shorts/' + videoId,\n    youtube_studio_url: 'https://studio.youtube.com/video/' + videoId + '/edit',\n    youtube_uploaded_title: title,\n    youtube_uploaded_description: description,\n    youtube_uploaded_hashtags: hashtags,\n    youtube_uploaded_tags: tags,\n    youtube_privacy_status_effective: visibilityUpdate.privacyStatus,\n    youtube_target_visibility: desiredVisibility,\n    youtube_processing_status: 'succeeded',\n    youtube_processing_status_raw: processingState.raw,\n    youtube_processing_status_source: processingState.source,\n    youtube_visibility_pending: false,\n    youtube_publish_mode: 'new_upload',\n    youtube_status_context: 'upload_completed_and_visibility_synced',\n    youtube_status_checked_at: new Date().toISOString(),\n    youtube_processing_wait_seconds: processingWaitSeconds,\n    youtube_existing_result_status: existingResultStatus,\n    youtube_existing_result_published_at: existingResultPublishedAt,\n    youtube_api_response: visibilityUpdate.raw,\n  });\n} catch (error) {\n  const reconciled = await findReconciledVideo.call(this, accessToken);\n  if (reconciled) {\n    return buildSuccess(reconciled);\n  }\n\n  const responseBody = error?.response?.body ?? error?.response?.data ?? error?.context ?? error?.cause ?? null;\n  const responseText = stringifyBody(responseBody);\n  const statusCode = error?.statusCode || error?.response?.statusCode || error?.response?.status || null;\n  const parts = [];\n  if (error?.message) parts.push(String(error.message));\n  if (statusCode) parts.push('status=' + String(statusCode));\n  if (responseText) parts.push(responseText);\n  return buildFailure(parts.join(' :: ') || 'Gagal upload ke YouTube Data API.');\n}"
       },
       "id": "c63c768d-fcc1-416c-8682-702e7f2dc3ee",
       "name": "Publish YouTube via API",
@@ -455,7 +441,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "const binaryFieldName = $binary ? Object.keys($binary)[0] : null;\nreturn {\n  json: {\n    ...$json,\n    manifest_binary_available: Boolean(binaryFieldName),\n    manifest_read_error: binaryFieldName ? null : ('Manifest file tidak terbaca dari path: ' + String($json.manifest_path || 'null')),\n  },\n  binary: $binary,\n};"
+        "jsCode": "const hasManifestBinary = Boolean($binary && $binary.data);\nreturn {\n  json: {\n    ...$json,\n    manifest_binary_available: hasManifestBinary,\n    manifest_read_error: hasManifestBinary ? null : ('Manifest file tidak terbaca dari path: ' + String($json.manifest_path || 'null')),\n  },\n  binary: $binary,\n};"
       },
       "id": "0f7d8c2d-manifestcheck-ytpublish01",
       "name": "Check Manifest Read",
@@ -568,11 +554,6 @@
             "node": "Read Manifest File",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Merge Manifest Context",
-            "type": "main",
-            "index": 0
           }
         ],
         []
@@ -586,11 +567,6 @@
             "node": "Read YouTube Config File",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Merge YouTube Config Context",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -599,18 +575,7 @@
       "main": [
         [
           {
-            "node": "Merge Manifest Context",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge Manifest Context": {
-      "main": [
-        [
-          {
-            "node": "Check Manifest Read",
+            "node": "Extract Manifest JSON",
             "type": "main",
             "index": 0
           }
@@ -648,17 +613,6 @@
       "main": [
         [
           {
-            "node": "Merge YouTube Config Context",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge YouTube Config Context": {
-      "main": [
-        [
-          {
             "node": "Inject YouTube Config",
             "type": "main",
             "index": 0
@@ -673,27 +627,11 @@
             "node": "Read Clip File",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Merge Clip Context",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
     },
     "Read Clip File": {
-      "main": [
-        [
-          {
-            "node": "Merge Clip Context",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge Clip Context": {
       "main": [
         [
           {
@@ -760,46 +698,6 @@
         [
           {
             "node": "Already Published?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Manifest Read": {
-      "main": [
-        [
-          {
-            "node": "Manifest Read OK?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Manifest Read OK?": {
-      "main": [
-        [
-          {
-            "node": "Extract Manifest JSON",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Build Manifest Read Failure",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Manifest Read Failure": {
-      "main": [
-        [
-          {
-            "node": "Build YouTube Failure Report",
             "type": "main",
             "index": 0
           }
