@@ -451,24 +451,21 @@ def build_normalized_audio_args(audio_duration=None):
 
 
 def build_download_commands(video_id, output_file, start=None, duration=None):
-    # Prefer H.264/progressive MP4 to avoid slow and fragile AV1/VP9 post-processing.
+    # Allow VP9/AV1 sources for highest quality; ffmpeg will transcode during crop anyway.
     format_selector = (
-        "bv*[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/"
-        "bv*[height<=1080][vcodec^=avc1]+ba/"
-        "b[height<=720][ext=mp4][vcodec^=avc1]/"
-        "b[height<=720][ext=mp4]"
+        "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/"
+        "bv*[height<=1080]+ba/"
+        "b[height<=1080]/"
+        "bv*+ba/b"
     )
-    fallback_selector = (
-        "bv*[height<=1080][vcodec^=avc1]+ba/"
-        "b[height<=720]/b"
-    )
+    fallback_selector = "bv*+ba/b"
 
     def make_command(selector):
         cmd = [
             sys.executable, "-m", "yt_dlp",
             "--force-ipv4",
             "--quiet", "--no-warnings",
-            "--merge-output-format", "mp4",
+            "--merge-output-format", "mkv",
             "-f", selector,
             "-o", output_file,
             f"https://youtu.be/{video_id}",
@@ -758,8 +755,8 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
     if end - start < 3:
         return False
 
-    segment_file = f"temp_segment_{index}.mp4"
-    full_file = f"temp_full_{index}.mp4"
+    segment_file = f"temp_segment_{index}.mkv"
+    full_file = f"temp_full_{index}.mkv"
     cropped_file = f"temp_cropped_{index}.mp4"
     subtitle_file = f"temp_{index}.srt"
     output_file = os.path.join(OUTPUT_DIR, f"clip_{index}.mp4")
@@ -863,34 +860,40 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                 )
 
         out_w, out_h = OUT_WIDTH, OUT_HEIGHT
+        normalize_vf_suffix = ",setsar=1,format=yuv420p"
         if crop_mode == "default":
             if OUTPUT_RATIO == "original":
-                cmd_crop = [
-                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", source_file, *source_seek_args,
-                    *video_codec_args,
-                    *build_export_audio_args(expected_duration),
-                    cropped_file
-                ]
-            else:
-                vf = build_cover_scale_crop_vf(out_w, out_h)
+                vf = "setsar=1,format=yuv420p"
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-i", source_file, *source_seek_args,
                     "-vf", vf,
                     *video_codec_args,
-                    *build_export_audio_args(expected_duration),
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    cropped_file
+                ]
+            else:
+                vf = build_cover_scale_crop_vf(out_w, out_h) + normalize_vf_suffix
+                cmd_crop = [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", source_file, *source_seek_args,
+                    "-vf", vf,
+                    *video_codec_args,
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
                     cropped_file
                 ]
         elif crop_mode == "split_left":
             if OUTPUT_RATIO == "original" or not out_w or not out_h or out_h < out_w:
-                vf = build_cover_scale_crop_vf(out_w or 720, out_h or 1280) if OUTPUT_RATIO != "original" else None
+                vf = build_cover_scale_crop_vf(out_w or 720, out_h or 1280) + normalize_vf_suffix if OUTPUT_RATIO != "original" else "setsar=1,format=yuv420p"
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-i", source_file, *source_seek_args,
-                    *([] if not vf else ["-vf", vf]),
+                    "-vf", vf,
                     *video_codec_args,
-                    *build_export_audio_args(expected_duration),
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
                     cropped_file
                 ]
             else:
@@ -901,7 +904,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     f"[scaled]split=2[s1][s2];"
                     f"[s1]crop={out_w}:{top_h}:(iw-{out_w})/2:(ih-{out_h})/2[top];"
                     f"[s2]crop={out_w}:{bottom_h}:0:ih-{bottom_h}[bottom];"
-                    f"[top][bottom]vstack[out]"
+                    f"[top][bottom]vstack,setsar=1,format=yuv420p[out]"
                 )
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -909,19 +912,21 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "-filter_complex", vf,
                     "-map", "[out]", "-map", "0:a:0?",
                     *video_codec_args,
-                    *build_normalized_audio_args(expected_duration),
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
                     "-shortest",
                     cropped_file
                 ]
         elif crop_mode == "split_right":
             if OUTPUT_RATIO == "original" or not out_w or not out_h or out_h < out_w:
-                vf = build_cover_scale_crop_vf(out_w or 720, out_h or 1280) if OUTPUT_RATIO != "original" else None
+                vf = build_cover_scale_crop_vf(out_w or 720, out_h or 1280) + normalize_vf_suffix if OUTPUT_RATIO != "original" else "setsar=1,format=yuv420p"
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-i", source_file, *source_seek_args,
-                    *([] if not vf else ["-vf", vf]),
+                    "-vf", vf,
                     *video_codec_args,
-                    *build_export_audio_args(expected_duration),
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
                     cropped_file
                 ]
             else:
@@ -932,7 +937,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     f"[scaled]split=2[s1][s2];"
                     f"[s1]crop={out_w}:{top_h}:(iw-{out_w})/2:(ih-{out_h})/2[top];"
                     f"[s2]crop={out_w}:{bottom_h}:iw-{out_w}:ih-{bottom_h}[bottom];"
-                    f"[top][bottom]vstack[out]"
+                    f"[top][bottom]vstack,setsar=1,format=yuv420p[out]"
                 )
                 cmd_crop = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -940,7 +945,8 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "-filter_complex", vf,
                     "-map", "[out]", "-map", "0:a:0?",
                     *video_codec_args,
-                    *build_normalized_audio_args(expected_duration),
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
                     "-shortest",
                     cropped_file
                 ]
@@ -988,10 +994,10 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-i", cropped_file,
                     "-t", str(expected_duration),
-                    "-vf", f"subtitles='{subtitle_path}'{fontsdir_arg}:force_style='{force_style}'",
+                    "-vf", f"subtitles='{subtitle_path}'{fontsdir_arg}:force_style='{force_style}',setsar=1,format=yuv420p",
                     *video_codec_args,
-                    *build_normalized_audio_args(expected_duration),
-                    "-shortest",
+                    "-c:a", "copy",
+                    "-movflags", "+faststart",
                     output_file
                 ]
                 
@@ -1023,12 +1029,6 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
                     pass
             os.rename(cropped_file, output_file)
 
-        normalize_output_for_publish(
-            output_file,
-            max_duration=expected_duration,
-            event_hook=event_hook,
-            log_hook=log_hook,
-        )
         assert_valid_output_file(output_file)
 
         emit_log("Clip successfully generated.", log_hook=log_hook)
@@ -1042,7 +1042,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
     except subprocess.CalledProcessError as e:
         cleanup_temp_files(
             index,
-            [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"],
+            [segment_file, full_file, cropped_file, subtitle_file],
         )
 
         emit_log("Failed to generate this clip.", log_hook=log_hook)
@@ -1053,7 +1053,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
     except Exception as e:
         cleanup_temp_files(
             index,
-            [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"],
+            [segment_file, full_file, cropped_file, subtitle_file],
         )
 
         emit_log("Failed to generate this clip.", log_hook=log_hook)
