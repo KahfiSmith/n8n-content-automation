@@ -2,6 +2,7 @@ import os
 import re
 import json
 import sys
+import glob
 import subprocess
 import requests
 import shutil
@@ -34,9 +35,9 @@ SUBTITLE_FONT = "Arial"
 SUBTITLE_FONTS_DIR = None
 SUBTITLE_LOCATION = "bottom"
 OUTPUT_RATIO = "9:16"
-OUT_WIDTH = 720
-OUT_HEIGHT = 1280
-LIGHTWEIGHT_EXPORT = True
+OUT_WIDTH = 1080
+OUT_HEIGHT = 1920
+LIGHTWEIGHT_EXPORT = False
 LIGHTWEIGHT_WIDTH = 540
 LIGHTWEIGHT_HEIGHT = 960
 
@@ -114,7 +115,7 @@ def set_ratio_preset(preset):
         if LIGHTWEIGHT_EXPORT:
             OUT_WIDTH, OUT_HEIGHT = LIGHTWEIGHT_WIDTH, LIGHTWEIGHT_HEIGHT
         else:
-            OUT_WIDTH, OUT_HEIGHT = 720, 1280
+            OUT_WIDTH, OUT_HEIGHT = 1080, 1920
         return
     if preset == "1:1":
         OUT_WIDTH, OUT_HEIGHT = 720, 720
@@ -425,9 +426,9 @@ def is_duration_close_enough(actual_duration, expected_duration):
 def build_video_codec_args():
     encoders = get_available_encoders()
     if "libx264" in encoders:
-        return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "30"]
+        return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
     if "libopenh264" in encoders:
-        return ["-c:v", "libopenh264", "-b:v", "1200k"]
+        return ["-c:v", "libopenh264", "-b:v", "5000k"]
     raise RuntimeError("No supported H.264 encoder found. Install FFmpeg with libx264 or libopenh264 support.")
 
 
@@ -450,18 +451,24 @@ def build_normalized_audio_args(audio_duration=None):
 
 
 def build_download_commands(video_id, output_file, start=None, duration=None):
+    # Prefer H.264/progressive MP4 to avoid slow and fragile AV1/VP9 post-processing.
     format_selector = (
-        "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/"
-        "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b"
+        "bv*[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/"
+        "bv*[height<=1080][vcodec^=avc1]+ba/"
+        "b[height<=720][ext=mp4][vcodec^=avc1]/"
+        "b[height<=720][ext=mp4]"
     )
-    fallback_selector = "bv*+ba/b"
+    fallback_selector = (
+        "bv*[height<=1080][vcodec^=avc1]+ba/"
+        "b[height<=720]/b"
+    )
 
     def make_command(selector):
         cmd = [
             sys.executable, "-m", "yt_dlp",
             "--force-ipv4",
             "--quiet", "--no-warnings",
-            "--merge-output-format", "mkv",
+            "--merge-output-format", "mp4",
             "-f", selector,
             "-o", output_file,
             f"https://youtu.be/{video_id}",
@@ -500,6 +507,19 @@ def run_download_command(cmd_primary, cmd_fallback):
             stderr=subprocess.PIPE,
             text=True,
         )
+
+
+def cleanup_temp_files(index, extra_paths=None):
+    paths = set(extra_paths or [])
+    for prefix in (f"temp_segment_{index}", f"temp_full_{index}"):
+        paths.update(glob.glob(f"{prefix}*"))
+
+    for path in paths:
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
 
 
 def build_export_audio_args(audio_duration=None):
@@ -738,8 +758,8 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
     if end - start < 3:
         return False
 
-    segment_file = f"temp_segment_{index}.mkv"
-    full_file = f"temp_full_{index}.mkv"
+    segment_file = f"temp_segment_{index}.mp4"
+    full_file = f"temp_full_{index}.mp4"
     cropped_file = f"temp_cropped_{index}.mp4"
     subtitle_file = f"temp_{index}.srt"
     output_file = os.path.join(OUTPUT_DIR, f"clip_{index}.mp4")
@@ -939,9 +959,7 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
             text=True
         )
 
-        for temp_path in [segment_file, full_file]:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        cleanup_temp_files(index, [segment_file, full_file])
 
         # Generate and burn subtitle if enabled
         if use_subtitle:
@@ -1022,13 +1040,10 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
         return True
 
     except subprocess.CalledProcessError as e:
-        # Cleanup temp files
-        for f in [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except Exception:
-                    pass
+        cleanup_temp_files(
+            index,
+            [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"],
+        )
 
         emit_log("Failed to generate this clip.", log_hook=log_hook)
         detail = (e.stderr or e.stdout or "").strip()
@@ -1036,13 +1051,10 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
             emit_log(f"Error details: {detail}", log_hook=log_hook)
         return False
     except Exception as e:
-        # Cleanup temp files
-        for f in [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"]:
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except Exception:
-                    pass
+        cleanup_temp_files(
+            index,
+            [segment_file, full_file, cropped_file, subtitle_file, output_file + ".normalized.mp4"],
+        )
 
         emit_log("Failed to generate this clip.", log_hook=log_hook)
         emit_log(f"Error: {str(e)}", log_hook=log_hook)
