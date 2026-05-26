@@ -213,10 +213,11 @@ def run_job(job_id, payload):
         success = 0
         for idx, item in enumerate(targets, start=1):
             set_job(job_id, current=idx, status_text=f"clip {idx}/{len(targets)}")
+            clip_number = success + 1
             ok = core.proses_satu_clip(
                 video_id,
                 item,
-                idx,
+                clip_number,
                 total_duration,
                 crop,
                 subtitle,

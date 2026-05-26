@@ -464,6 +464,7 @@ def build_download_commands(video_id, output_file, start=None, duration=None):
         cmd = [
             sys.executable, "-m", "yt_dlp",
             "--force-ipv4",
+            "--force-overwrites",
             "--quiet", "--no-warnings",
             "--merge-output-format", "mkv",
             "-f", selector,
@@ -760,6 +761,10 @@ def proses_satu_clip(video_id, item, index, total_duration, crop_mode="default",
     cropped_file = f"temp_cropped_{index}.mp4"
     subtitle_file = f"temp_{index}.srt"
     output_file = os.path.join(OUTPUT_DIR, f"clip_{index}.mp4")
+
+    # Clean leftover temp files from previous failed runs
+    cleanup_temp_files(index, [segment_file, full_file, cropped_file, subtitle_file])
+
     video_codec_args = build_video_codec_args()
     expected_duration = max(0.0, end - start)
     source_file = segment_file
