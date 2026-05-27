@@ -177,24 +177,6 @@ Status yang relevan untuk approval tetap:
 
 ---
 
-## Future: Publish TikTok via Zapier
-
-TikTok tidak lagi didukung via kode custom di repo ini karena API developer TikTok mensyaratkan proses review aplikasi yang panjang dan akses yang terbatas.
-
-Jalur yang direkomendasikan untuk MVP adalah Zapier sebagai bridge:
-
-1. n8n membaca `caption_result.json`
-2. n8n expand satu item per clip
-3. n8n mengirim payload ke Zapier Catch Hook
-4. Zapier upload video ke TikTok
-5. n8n menulis marker `tiktok_zapier_result_clip_*.json`
-
-Catatan penting: Zapier tidak bisa membaca path lokal Docker seperti `/files/ready/...`. Payload ke Zapier harus memakai URL video yang bisa diakses Zapier, misalnya Google Drive, Dropbox, R2/S3 public atau signed URL, atau file endpoint di VPS.
-
-Dokumen setup: [10 - Setup TikTok via Zapier](10-tiktok-zapier-setup.md)
-
----
-
 ## Future: Publish Facebook Reels
 
 Pisahkan workflow Facebook Reels dari YouTube dan aktifkan hanya jika target platform memang sudah siap.
