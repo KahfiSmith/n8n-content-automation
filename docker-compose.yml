@@ -23,6 +23,9 @@ services:
     image: docker.n8n.io/n8nio/n8n:1.94.1
     container_name: n8n-app
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,6 +54,7 @@ services:
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Asia/Jakarta}
       TZ: ${TZ:-Asia/Jakarta}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ZERNIO_API_KEY: ${ZERNIO_API_KEY:-}
       OPENAI_CAPTION_MODEL: ${OPENAI_CAPTION_MODEL:-gpt-5.4-mini}
       OPENAI_CAPTION_LANGUAGE: ${OPENAI_CAPTION_LANGUAGE:-id}
       OPENAI_CAPTION_BRAND_VOICE: ${OPENAI_CAPTION_BRAND_VOICE:-ringkas, tajam, natural, tidak clickbait murahan}

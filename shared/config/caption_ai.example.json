@@ -3,5 +3,5 @@
   "openai_caption_model": "gpt-5.4-mini",
   "openai_caption_language": "id",
   "openai_caption_brand_voice": "ringkas, tajam, natural, tidak clickbait murahan",
-  "openai_caption_max_hashtags": 8
+  "openai_caption_max_hashtags": 3
 }
