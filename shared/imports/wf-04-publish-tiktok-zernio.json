@@ -1,0 +1,453 @@
+{
+  "createdAt": "2026-05-29T10:00:00.000Z",
+  "updatedAt": "2026-05-29T10:00:00.000Z",
+  "id": "wf04TiktokZernio01",
+  "name": "WF-04 Publish TikTok via Zernio",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "c1000001-0001-4000-8000-000000000001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2400,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/files/ready/*/caption_result.json",
+        "dataPropertyName": "data"
+      },
+      "id": "c1000001-0001-4000-8000-000000000002",
+      "name": "Read Caption Results",
+      "type": "n8n-nodes-base.readBinaryFiles",
+      "typeVersion": 1,
+      "position": [
+        -2180,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\nfor (let i = 0; i < $input.all().length; i++) {\n  const item = $input.all()[i];\n  try {\n    const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n    const text = buffer.toString('utf8').replace(/^\\uFEFF/, '');\n    output.push({ json: { ...item.json, caption_result: JSON.parse(text) }, binary: item.binary, pairedItem: { item: i } });\n  } catch (e) {\n    continue;\n  }\n}\nreturn output;"
+      },
+      "id": "c1000001-0001-4000-8000-000000000003",
+      "name": "Parse Caption JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1960,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst output = [];\n\nfor (const item of $input.all()) {\n  const caption = item.json.caption_result || {};\n  if (caption.status !== 'CAPTION_GENERATED') continue;\n  if (!caption.manifest_path) continue;\n\n  const clips = caption.clip_caption_pack || [];\n  const jobId = caption.job_id;\n  const manifestPath = caption.manifest_path.replace(/^\\.\\//,'').replace(/\\\\/g,'/');\n  const jobDir = '/files/' + manifestPath.replace(/^shared\\//, '').replace(/\\/manifest\\.json$/, '');\n\n  for (const clip of clips) {\n    const clipIndex = clip.clip_index || 1;\n    const padded = String(clipIndex).padStart(2, '0');\n    const resultFile = jobDir + '/tiktok_publish_result_clip_' + padded + '.json';\n\n    // Skip clips already handed off to Zernio or published unless an explicit canary rerun is requested.\n    if (fs.existsSync(resultFile)) {\n      try {\n        const existing = JSON.parse(fs.readFileSync(resultFile, 'utf8'));\n        const completed = ['TIKTOK_DRAFT_CREATED', 'TIKTOK_PUBLISHED', 'TIKTOK_UPLOADED'].includes(existing.status);\n        if (completed && existing.force_rerun !== true) continue;\n      } catch (e) {}\n    }\n\n    const captions = Array.isArray(clip.captions) ? clip.captions : [];\n    const tiktokCap = captions.find(c => c.platform === 'tiktok') || captions[0] || {};\n    const captionText = tiktokCap.caption || '';\n    const hashtags = Array.isArray(tiktokCap.hashtags) ? tiktokCap.hashtags : [];\n    const fullCaption = [captionText, hashtags.join(' ')].filter(Boolean).join(' ').trim();\n\n    const clipFileName = clip.file_name || ('clip_' + clipIndex + '.mp4');\n    const clipPath = jobDir + '/' + clipFileName;\n\n    output.push({\n      json: {\n        job_id: jobId,\n        clip_id: 'clip_' + padded,\n        clip_index: clipIndex,\n        clip_path: clipPath,\n        clip_file_name: clipFileName,\n        caption_full: fullCaption,\n        result_path: resultFile,\n        gdrive_folder_id: '180muUbpoFBBu_9Mo0Xe-VnxpIHNL2lhF',\n      }\n    });\n    // Upload one clip per schedule to avoid overlapping large Drive uploads on a local connection.\n    if (output.length >= 1) return output;\n  }\n}\n\nif (output.length === 0) {\n  return [{ json: { status: 'NOTHING_TO_UPLOAD' } }];\n}\nreturn output;"
+      },
+      "id": "c1000001-0001-4000-8000-000000000004",
+      "name": "Build Upload Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1740,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-clip-path",
+              "leftValue": "={{ $json.clip_path }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals",
+                "name": "filter.operator.notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c1000001-0001-4000-8000-000000000005",
+      "name": "Has Clips?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1520,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.clip_path }}",
+        "options": {
+          "fileExtension": "mp4",
+          "fileName": "={{ $json.clip_file_name }}",
+          "mimeType": "video/mp4",
+          "dataPropertyName": "data"
+        }
+      },
+      "id": "c1000001-0001-4000-8000-000000000006",
+      "name": "Read Clip File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -1300,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sourceItems = $('Build Upload Items').all();\nconst output = [];\n\nfor (let index = 0; index < $input.all().length; index++) {\n  const item = $input.all()[index];\n  const source = sourceItems[index] ? sourceItems[index].json : {};\n  const video = item.binary && item.binary.data;\n  if (!video) {\n    throw new Error('Binary video tidak ditemukan untuk clip: ' + (source.clip_path || item.json.clip_path || 'unknown'));\n  }\n\n  const fileName = String(source.clip_file_name || item.json.clip_file_name || video.fileName || '').trim();\n  if (!fileName.toLowerCase().endsWith('.mp4')) {\n    throw new Error('Clip harus berupa MP4 sebelum upload Google Drive: ' + (fileName || source.clip_path || item.json.clip_path || 'unknown'));\n  }\n\n  // Materialize one stream at a time so Google Drive uses media upload with Content-Type video/mp4.\n  // Keeping the n8n binary storage id triggers resumable upload without the correct MIME header in n8n 1.94.1.\n  const buffer = await this.helpers.getBinaryDataBuffer(index, 'data');\n\n  output.push({\n    json: {\n      ...source,\n      ...item.json,\n      fileName,\n      fileExtension: 'mp4',\n      mimeType: 'video/mp4',\n    },\n    binary: {\n      data: {\n        data: buffer.toString('base64'),\n        fileName,\n        fileExtension: 'mp4',\n        mimeType: 'video/mp4',\n      },\n    },\n    pairedItem: { item: index },\n  });\n}\n\nreturn output;"
+      },
+      "id": "c1000001-0001-4000-8000-000000000007",
+      "name": "Normalize Video Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/drive/v3/files",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "uploadType",
+              "value": "resumable"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "fields",
+              "value": "id,name,mimeType"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Upload-Content-Type",
+              "value": "video/mp4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { name: $('Normalize Video Binary').item.json.job_id + '_' + $('Normalize Video Binary').item.json.clip_file_name, mimeType: 'video/mp4', parents: [$('Normalize Video Binary').item.json.gdrive_folder_id] } }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "c1000001-0001-4000-8000-000000000030",
+      "name": "Start GDrive Resumable Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -860,
+        260
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "rpITMqiGoYnbvAVf",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sourceItems = $('Normalize Video Binary').all();\n\nreturn $input.all().map((item, index) => {\n  const source = sourceItems[index];\n  const location = item.json && item.json.headers && item.json.headers.location;\n  if (!location) {\n    throw new Error('Google Drive tidak mengembalikan resumable session URI.');\n  }\n  if (!source || !source.binary || !source.binary.data) {\n    throw new Error('Binary video hilang sebelum resumable upload.');\n  }\n\n  return {\n    json: {\n      ...source.json,\n      resumable_upload_url: location,\n    },\n    binary: source.binary,\n    pairedItem: { item: index },\n  };\n});"
+      },
+      "id": "c1000001-0001-4000-8000-000000000035",
+      "name": "Attach Video to Resumable Session",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -750,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "method": "PUT",
+        "url": "={{ $json.resumable_upload_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "video/mp4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 900000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "c1000001-0001-4000-8000-000000000034",
+      "name": "Upload to GDrive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -640,
+        260
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "rpITMqiGoYnbvAVf",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item, index) => {\n  const mimeType = String(item.json.mimeType || '').toLowerCase();\n  if (mimeType !== 'video/mp4') {\n    throw new Error('Google Drive menyimpan file dengan MIME type yang salah: ' + (mimeType || 'unknown') + '. Expected: video/mp4');\n  }\n\n  return {\n    json: item.json,\n    binary: item.binary,\n    pairedItem: { item: index },\n  };\n});"
+      },
+      "id": "c1000001-0001-4000-8000-000000000033",
+      "name": "Validate GDrive Video MIME",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -530,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": "={{ $json.id }}",
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "id": "c1000001-0001-4000-8000-000000000031",
+      "name": "Share Public",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 2,
+      "position": [
+        -310,
+        260
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "rpITMqiGoYnbvAVf",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst clipItems = $('Normalize Video Binary').all();\nconst driveItems = $('Upload to GDrive').all();\nconst output = [];\n\nconst apiKey = fs.readFileSync('/files/config/zernio_api_key.txt', 'utf8').trim();\n\nfor (let i = 0; i < clipItems.length; i++) {\n  const original = clipItems[i].json;\n  const driveResponse = driveItems[i] ? driveItems[i].json : {};\n  const fileId = driveResponse.id || '';\n  const videoUrl = fileId ? 'https://drive.google.com/uc?export=download&id=' + fileId : '';\n\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://zernio.com/api/v1/posts',\n    headers: {\n      'Authorization': 'Bearer ' + apiKey,\n      'Content-Type': 'application/json',\n    },\n    body: {\n      content: original.caption_full || '',\n      mediaItems: [{url: videoUrl, type: 'video'}],\n      platforms: [{platform: 'tiktok', accountId: '6a1977512b2567671a65fbe5'}],\n    },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n  });\n\n  const statusCode = response.statusCode || 0;\n  const result = {\n    status: statusCode >= 200 && statusCode < 300 ? 'TIKTOK_DRAFT_CREATED' : 'TIKTOK_PUBLISH_FAILED',\n    published_at: new Date().toISOString(),\n    job_id: original.job_id,\n    clip_id: original.clip_id,\n    clip_index: original.clip_index,\n    video_url: videoUrl,\n    gdrive_file_id: fileId,\n    gdrive_mime_type: driveResponse.mimeType || '',\n    caption: original.caption_full,\n    zernio_status: statusCode,\n    zernio_response: response.body,\n  };\n\n  const resultPath = original.result_path;\n  if (resultPath) {\n    fs.writeFileSync(resultPath, JSON.stringify(result, null, 2), 'utf8');\n  }\n\n  output.push({json: result});\n}\n\nreturn output;"
+      },
+      "id": "c1000001-0001-4000-8000-000000000032",
+      "name": "Post Draft to Zernio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Caption Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Caption Results": {
+      "main": [
+        [
+          {
+            "node": "Parse Caption JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Caption JSON": {
+      "main": [
+        [
+          {
+            "node": "Build Upload Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Upload Items": {
+      "main": [
+        [
+          {
+            "node": "Has Clips?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Clips?": {
+      "main": [
+        [
+          {
+            "node": "Read Clip File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Read Clip File": {
+      "main": [
+        [
+          {
+            "node": "Normalize Video Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Video Binary": {
+      "main": [
+        [
+          {
+            "node": "Start GDrive Resumable Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to GDrive": {
+      "main": [
+        [
+          {
+            "node": "Validate GDrive Video MIME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate GDrive Video MIME": {
+      "main": [
+        [
+          {
+            "node": "Share Public",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share Public": {
+      "main": [
+        [
+          {
+            "node": "Post Draft to Zernio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start GDrive Resumable Upload": {
+      "main": [
+        [
+          {
+            "node": "Attach Video to Resumable Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Video to Resumable Session": {
+      "main": [
+        [
+          {
+            "node": "Upload to GDrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "pinData": {}
+}
