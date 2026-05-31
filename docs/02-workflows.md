@@ -10,6 +10,8 @@ Mendefinisikan workflow n8n modular untuk kasus saat clip sudah tersedia dari fo
 1. `WF-01 Intake Clip + Validate Assets`
 2. `WF-02 Generate Caption`
 3. `WF-03 Publish YouTube Shorts`
+4. `WF-04 Publish TikTok via Zernio`
+5. `WF-05 Manual GDrive Inbox to TikTok Zernio Draft`
 
 ## Future / optional
 
@@ -161,6 +163,80 @@ Workflow ini hanya jalan jika `platform_targets` mengandung `youtube_shorts`.
 - jika `processingDetails.processingStatus` tidak ada, workflow akan fallback ke `status.uploadStatus`; nilai `processed` dipetakan sebagai final sukses agar status tidak nyangkut `pending` hanya karena beda field API
 - untuk debugging lokal, bandingkan `published_at` dengan `status_checked_at`; kalau `published_at` lama tapi `status_checked_at` baru, artinya workflow sedang recheck video existing, bukan upload ulang
 - karena workflow sekarang menulis result per clip, rerun publish akan memakai file `youtube_publish_result_clip_*.json` sebagai checkpoint agar tidak upload ulang clip yang sama
+
+---
+
+## WF-04 Publish TikTok via Zernio
+
+### Tujuan
+Upload clip yang sudah punya caption ke TikTok melalui Zernio API (draft mode).
+
+### Trigger
+- Cron polling setiap 15 menit
+
+### Flow
+1. Baca semua `caption_result.json` dari `shared/ready/*/`
+2. Filter hanya yang `status === 'CAPTION_GENERATED'`
+3. Baca file clip `.mp4`, upload ke Google Drive (resumable upload)
+4. Share file Google Drive public
+5. Post draft ke TikTok via Zernio API (`POST https://zernio.com/api/v1/posts`)
+6. Tulis `tiktok_publish_result_clip_XX.json` per clip
+
+### Config
+- `shared/config/zernio_api_key.txt` — API key Zernio (fallback: `$env.ZERNIO_API_KEY`)
+- `shared/config/wf05_manual_gdrive.json` — `zernio_tiktok_account_id` (fallback: `$env.ZERNIO_TIKTOK_ACCOUNT_ID`)
+
+### Output
+- `tiktok_publish_result_clip_01.json` dst.
+- Status: `TIKTOK_DRAFT_CREATED` atau `TIKTOK_PUBLISH_FAILED`
+
+### Dedupe
+- Skip clip yang sudah punya result file dengan status `TIKTOK_DRAFT_CREATED`, `TIKTOK_PUBLISHED`, atau `TIKTOK_UPLOADED`
+- Force rerun: set `force_rerun: true` di result file yang ada
+
+### Error handling
+- GDrive upload gagal: workflow berhenti, tidak ada result file (akan dicoba ulang di run berikutnya)
+- Zernio API gagal: tulis result dengan status `TIKTOK_PUBLISH_FAILED` dan detail error
+
+---
+
+## WF-05 Manual GDrive Inbox to TikTok Zernio Draft
+
+### Tujuan
+Pantau folder Google Drive tertentu, generate caption TikTok otomatis via OpenAI, lalu post draft ke TikTok via Zernio.
+
+### Trigger
+- Cron polling setiap 5 menit
+
+### Flow
+1. Baca config dari `shared/config/wf05_manual_gdrive.json`
+2. List semua file MP4 di folder Google Drive inbox
+3. Filter file yang belum diproses (cek state file)
+4. Generate caption TikTok via OpenAI (max 8 hashtag, lowercase)
+5. Share file Google Drive public
+6. Post draft ke TikTok via Zernio API
+7. Update state file (atomic write, cleanup entry >90 hari)
+
+### Config
+- `shared/config/wf05_manual_gdrive.json`:
+  - `manual_drive_inbox_folder_id` — ID folder Google Drive yang dipantau
+  - `zernio_tiktok_account_id` — ID akun TikTok di Zernio
+  - `default_content_context` — konteks umum channel untuk caption AI
+- `shared/config/caption_ai.json` — pengaturan OpenAI caption
+- `shared/config/zernio_api_key.txt` — API key Zernio (fallback: `$env.ZERNIO_API_KEY`)
+
+### State
+- `shared/state/wf05_manual_gdrive_processed.json` — track file yang sudah diproses
+- Entry otomatis dihapus setelah 90 hari (cleanup rotation)
+- Atomic write untuk mencegah race condition
+
+### Output
+- Draft TikTok di Zernio (belum publish otomatis)
+- State file diupdate dengan status `TIKTOK_DRAFT_CREATED`
+
+### Dedupe
+- Skip file yang sudah ada di state file dengan status `TIKTOK_DRAFT_CREATED`
+- Hapus entry dari state file untuk reprocess video yang sama
 
 ---
 

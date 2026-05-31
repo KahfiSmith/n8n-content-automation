@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:16-alpine
-    pull_policy: never
     container_name: n8n-postgres
     restart: unless-stopped
     environment:
@@ -20,7 +19,7 @@ services:
       retries: 10
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:1.94.1
+    image: docker.n8n.io/n8nio/n8n:1.97.1
     container_name: n8n-app
     restart: unless-stopped
     dns:
@@ -48,8 +47,8 @@ services:
       N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
       N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:-changeme}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
-      NODE_FUNCTION_ALLOW_BUILTIN: "*"
-      NODE_FUNCTION_ALLOW_EXTERNAL: "*"
+      NODE_FUNCTION_ALLOW_BUILTIN: "fs,path,https,http,buffer,util,url,stream,events,os,child_process,crypto"
+      NODE_FUNCTION_ALLOW_EXTERNAL: ""
       N8N_RESTRICT_FILE_ACCESS_TO: /files;/home/node/.n8n-files
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Asia/Jakarta}
       TZ: ${TZ:-Asia/Jakarta}
@@ -62,6 +61,19 @@ services:
     volumes:
       - ./n8n:/home/node/.n8n
       - ./shared:/files
+
+  python-clipper:
+    build: ./python_clipper
+    container_name: python-clipper
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      OUTPUT_DIR: /app/output
+    volumes:
+      - ./shared/ready:/app/output
+    profiles:
+      - clipper
 
 volumes:
   postgres_data:

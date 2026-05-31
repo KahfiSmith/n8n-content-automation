@@ -5,6 +5,15 @@
 shared/config/caption_ai.json
 shared/config/youtube_oauth.json
 shared/config/tiktok_posting.json
+shared/config/zernio_api_key.txt
+shared/config/wf05_manual_gdrive.json
+**/youtube_cookies.txt
+
+# Workflow state and runtime data
+shared/state/*.json
+shared/ready/*/
+shared/published/*/
+shared/failed/*/
 
 # n8n runtime data
 n8n/database.sqlite
