@@ -6,27 +6,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from env_utils import load_env, to_bool
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV_PATH = ROOT / ".env"
 OUTPUT_PATH = ROOT / "shared" / "config" / "youtube_oauth.json"
-
-
-def load_env(path: Path) -> dict[str, str]:
-    data: dict[str, str] = {}
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        data[key.strip()] = value.strip().strip('"').strip("'")
-    return data
-
-
-def to_bool(value: str | None, default: bool) -> bool:
-    if value is None or value == "":
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def main() -> None:
