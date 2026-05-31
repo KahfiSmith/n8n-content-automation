@@ -39,6 +39,11 @@ const I18N = {
     "help.subtitle_location": "Bottom = lebih natural buat Shorts. Centered = lebih “in your face”.",
     "label.subtitle_fontsdir": "Fonts dir (opsional)",
     "help.subtitle_fontsdir": "Folder berisi file .ttf/.otf buat subtitle. Default: folder project <b>fonts</b>.",
+    "label.cookies": "Cookies File (opsional)",
+    "ph.cookies": "youtube_cookies.txt",
+    "help.cookies": "Path ke file cookies YouTube. Export dari browser untuk hindari blokir bot.",
+    "label.subtitle_outline": "Subtitle Outline",
+    "help.subtitle_outline": "Ketebalan outline subtitle (pixel). 0 = tanpa outline.",
     "label.start": "Start (detik atau mm:ss)",
     "ph.start": "689 atau 11:29",
     "label.end": "End (detik atau mm:ss)",
@@ -106,6 +111,11 @@ const I18N = {
     "help.subtitle_location": "Bottom looks natural for Shorts. Centered is more “in your face”.",
     "label.subtitle_fontsdir": "Fonts dir (optional)",
     "help.subtitle_fontsdir": "Folder containing .ttf/.otf for subtitles. Default: project <b>fonts</b> folder.",
+    "label.cookies": "Cookies File (optional)",
+    "ph.cookies": "youtube_cookies.txt",
+    "help.cookies": "Path to YouTube cookies file. Export from browser to avoid bot blocking.",
+    "label.subtitle_outline": "Subtitle Outline",
+    "help.subtitle_outline": "Subtitle outline thickness (pixels). 0 = no outline.",
     "label.start": "Start (seconds or mm:ss)",
     "ph.start": "689 or 11:29",
     "label.end": "End (seconds or mm:ss)",
@@ -368,6 +378,8 @@ function readPayload() {
     subtitle_font: subtitleFont,
     subtitle_location: $("subtitle_location").value,
     subtitle_fontsdir: $("subtitle_fontsdir").value || "",
+    subtitle_outline: Number($("subtitle_outline").value || 1),
+    cookies: $("cookies").value.trim() || "",
     start: $("start").value || "",
     end: $("end").value || "",
   };
@@ -618,7 +630,7 @@ async function preview() {
     sub.textContent = "";
     img.removeAttribute("src");
     box.classList.remove("hide");
-    const data = await postJson("/api/preview", { url });
+    const data = await postJson("/api/preview", { url, cookies: $("cookies").value.trim() || "" });
     const p = data.preview || {};
     currentPreview = p;
     if (p.id) currentVideoId = p.id;
