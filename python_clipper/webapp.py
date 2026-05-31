@@ -134,6 +134,9 @@ def run_job(job_id, payload):
         subtitle_font = payload.get("subtitle_font") or "Arial"
         subtitle_location = payload.get("subtitle_location") or "bottom"
         subtitle_fontsdir = payload.get("subtitle_fontsdir") or None
+        subtitle_outline = safe_int(payload.get("subtitle_outline"), 1)
+        subtitle_shadow = safe_int(payload.get("subtitle_shadow"), 0)
+        cookies = payload.get("cookies") or None
         if not subtitle_fontsdir and os.path.isdir("fonts"):
             subtitle_fontsdir = "fonts"
         padding = safe_int(payload.get("padding"), 10)
@@ -145,6 +148,9 @@ def run_job(job_id, payload):
         core.SUBTITLE_FONT = subtitle_font
         core.SUBTITLE_FONTS_DIR = subtitle_fontsdir
         core.SUBTITLE_LOCATION = subtitle_location
+        core.SUBTITLE_OUTLINE = max(0, subtitle_outline)
+        core.SUBTITLE_SHADOW = max(0, subtitle_shadow)
+        core.YTDLP_COOKIES = cookies
         core.PADDING = max(0, padding if padding is not None else 10)
         core.set_ratio_preset(ratio)
 
@@ -309,6 +315,8 @@ def get_preview(url):
         "-J",
         key,
     ]
+    if core.YTDLP_COOKIES and os.path.isfile(core.YTDLP_COOKIES):
+        cmd.extend(["--cookies", core.YTDLP_COOKIES])
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         raise RuntimeError((res.stderr or res.stdout or "Gagal ambil metadata").strip())
@@ -337,6 +345,9 @@ def get_preview(url):
 def api_preview():
     data = request.get_json(silent=True) or {}
     url = (data.get("url") or "").strip()
+    cookies = (data.get("cookies") or "").strip()
+    if cookies:
+        core.YTDLP_COOKIES = cookies
     try:
         preview = get_preview(url)
         return jsonify({"ok": True, "preview": preview})

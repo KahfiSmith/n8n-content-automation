@@ -31,9 +31,13 @@ TOP_HEIGHT = 960          # Height for top section (center content) in split mod
 BOTTOM_HEIGHT = 320       # Height for bottom section (facecam) in split mode
 USE_SUBTITLE = True       # Enable auto subtitle using Faster-Whisper (4-5x faster)
 WHISPER_MODEL = "small"    # Whisper model size: tiny, base, small, medium, large
+WHISPER_LANGUAGE = None    # Whisper language code (e.g., "id", "en"). None = auto-detect
 SUBTITLE_FONT = "Arial"
 SUBTITLE_FONTS_DIR = None
 SUBTITLE_LOCATION = "bottom"
+SUBTITLE_OUTLINE = 1        # Outline thickness in pixels (0 = no outline)
+SUBTITLE_SHADOW = 0         # Shadow depth in pixels (0 = no shadow)
+YTDLP_COOKIES = None        # Path to YouTube cookies file (Netscape format)
 OUTPUT_RATIO = "9:16"
 OUT_WIDTH = 1080
 OUT_HEIGHT = 1920
@@ -172,6 +176,7 @@ def parse_args():
         help="Enable auto subtitle (y/n)",
     )
     parser.add_argument("--whisper-model", dest="whisper_model", help="Faster-Whisper model")
+    parser.add_argument("--whisper-language", dest="whisper_language", help="Whisper language code (e.g., id, en). Default: auto-detect")
     parser.add_argument("--subtitle-font", dest="subtitle_font", help="Subtitle font name (e.g., Poppins)")
     parser.add_argument("--subtitle-fontsdir", dest="subtitle_fontsdir", help="Folder containing .ttf/.otf fonts")
     parser.add_argument(
@@ -180,9 +185,12 @@ def parse_args():
         choices=["center", "bottom"],
         help="Subtitle placement: center or bottom",
     )
+    parser.add_argument("--subtitle-outline", dest="subtitle_outline", type=int, help="Subtitle outline thickness in pixels (0=no outline, default=2)")
+    parser.add_argument("--subtitle-shadow", dest="subtitle_shadow", type=int, help="Subtitle shadow depth in pixels (0=no shadow, default=1)")
     parser.add_argument("--ratio", choices=["9:16", "1:1", "16:9", "original"], help="Output ratio preset")
     parser.add_argument("--check", action="store_true", help="Check dependencies then exit")
     parser.add_argument("--no-update-ytdlp", action="store_true", help="Skip auto-update yt-dlp")
+    parser.add_argument("--cookies", dest="cookies", help="Path to YouTube cookies file (Netscape format)")
     return parser.parse_args()
 
 
@@ -198,10 +206,11 @@ def escape_subtitles_filter_dir(path):
 def build_subtitle_force_style():
     alignment = "2" if SUBTITLE_LOCATION == "bottom" else "5"
     margin_v = "40" if SUBTITLE_LOCATION == "bottom" else "0"
+    border_style = "3" if SUBTITLE_OUTLINE == 0 and SUBTITLE_SHADOW == 0 else "1"
     return (
         f"FontName={SUBTITLE_FONT},FontSize=12,Bold=1,"
         f"PrimaryColour=&HFFFFFF,OutlineColour=&H000000,"
-        f"BorderStyle=1,Outline=2,Shadow=1,"
+        f"BorderStyle={border_style},Outline={SUBTITLE_OUTLINE},Shadow={SUBTITLE_SHADOW},"
         f"Alignment={alignment},MarginV={margin_v}"
     )
 
@@ -276,6 +285,12 @@ def cek_dependensi(install_whisper=False, fatal=True):
             stderr=subprocess.DEVNULL
         )
 
+    if not shutil.which("deno"):
+        print("⚠️  deno tidak ditemukan. yt-dlp butuh JS runtime untuk YouTube.")
+        print("   Install: curl -fsSL https://deno.land/install.sh | sh")
+        print("   Atau: brew install deno (macOS)")
+        print()
+
     if install_whisper:
         # Check if faster-whisper package is installed
         try:
@@ -318,6 +333,14 @@ def cek_dependensi(install_whisper=False, fatal=True):
             sys.exit(1)
         return False
     return True
+
+
+def build_ytdlp_base_cmd():
+    """Build yt-dlp base command with cookies if available."""
+    cmd = [sys.executable, "-m", "yt_dlp"]
+    if YTDLP_COOKIES and os.path.isfile(YTDLP_COOKIES):
+        cmd.extend(["--cookies", YTDLP_COOKIES])
+    return cmd
 
 
 def get_available_encoders():
@@ -462,7 +485,7 @@ def build_download_commands(video_id, output_file, start=None, duration=None):
 
     def make_command(selector):
         cmd = [
-            sys.executable, "-m", "yt_dlp",
+            *build_ytdlp_base_cmd(),
             "--force-ipv4",
             "--force-overwrites",
             "--quiet", "--no-warnings",
@@ -585,12 +608,26 @@ def ambil_most_replayed(video_id):
     Returns a list of high-engagement segments.
     """
     url = f"https://www.youtube.com/watch?v={video_id}"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
 
     print("Reading YouTube heatmap data...")
 
+    cookies_dict = {}
+    if YTDLP_COOKIES and os.path.isfile(YTDLP_COOKIES):
+        try:
+            with open(YTDLP_COOKIES, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    parts = line.split("\t")
+                    if len(parts) >= 7:
+                        cookies_dict[parts[5]] = parts[6]
+        except Exception:
+            pass
+
     try:
-        html = requests.get(url, headers=headers, timeout=20).text
+        html = requests.get(url, headers=headers, cookies=cookies_dict, timeout=20).text
     except Exception:
         return []
 
@@ -637,9 +674,7 @@ def get_duration(video_id):
     Retrieve the total duration of a YouTube video in seconds.
     """
     cmd = [
-        sys.executable,
-        "-m",
-        "yt_dlp",
+        *build_ytdlp_base_cmd(),
         "--get-duration",
         f"https://youtu.be/{video_id}"
     ]
@@ -684,7 +719,7 @@ def generate_subtitle(video_file, subtitle_file, event_hook=None, log_hook=None)
                 event_hook("stage", {"stage": "subtitle_transcribe"})
             except Exception:
                 pass
-        segments, info = model.transcribe(video_file, language="id")
+        segments, info = model.transcribe(video_file, language=WHISPER_LANGUAGE)
         return segments
 
     try:
@@ -1076,6 +1111,9 @@ def main():
     if args.whisper_model:
         global WHISPER_MODEL
         WHISPER_MODEL = args.whisper_model
+    if args.whisper_language:
+        global WHISPER_LANGUAGE
+        WHISPER_LANGUAGE = args.whisper_language
     if args.subtitle_font:
         global SUBTITLE_FONT
         SUBTITLE_FONT = args.subtitle_font
@@ -1085,6 +1123,15 @@ def main():
     if args.subtitle_location:
         global SUBTITLE_LOCATION
         SUBTITLE_LOCATION = args.subtitle_location
+    if args.subtitle_outline is not None:
+        global SUBTITLE_OUTLINE
+        SUBTITLE_OUTLINE = max(0, args.subtitle_outline)
+    if args.subtitle_shadow is not None:
+        global SUBTITLE_SHADOW
+        SUBTITLE_SHADOW = max(0, args.subtitle_shadow)
+    if args.cookies:
+        global YTDLP_COOKIES
+        YTDLP_COOKIES = args.cookies
     if args.ratio:
         set_ratio_preset(args.ratio)
 
