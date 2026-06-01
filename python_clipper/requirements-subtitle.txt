@@ -1,0 +1,4 @@
+# Optional: subtitle dependencies
+# Install with: pip install -r requirements-subtitle.txt
+# Only needed if you use --subtitle y (auto subtitle with Faster-Whisper)
+faster-whisper>=1.0.0

@@ -17,8 +17,8 @@ dan tidak berasal dari Python clipper.
 Setup:
 
 1. Buat folder Google Drive khusus inbox manual.
-2. Salin `config/wf05_manual_gdrive.example.json` menjadi
-   `config/wf05_manual_gdrive.json`.
+2. Salin `config/tiktok_zernio.example.json` menjadi
+   `config/tiktok_zernio.json`.
 3. Isi `manual_drive_inbox_folder_id` dengan ID folder inbox tersebut.
 4. Import `imports/wf-05-manual-gdrive-to-zernio.json`, lalu aktifkan workflow.
 

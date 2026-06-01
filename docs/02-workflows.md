@@ -105,6 +105,12 @@ Menghasilkan caption dan hashtag yang relevan dengan isi clip tanpa output templ
 - jika `transcript_path` kosong, `WF-02` sebaiknya tetap memakai `source_video_title`, `source_video_uploader`, dan deskripsi sumber dari `manifest.json` agar caption tidak jatuh ke fallback generik
 - `next_stage` default untuk MVP lokal sekarang adalah `WF-03_PUBLISH_YOUTUBE_SHORTS`
 
+### Catatan max_hashtags per platform
+- **YouTube Shorts**: max 3 hashtag karena title YouTube dibatasi 100 karakter; caption dipendekkan agar hashtag muat
+- **TikTok**: max 8 hashtag karena TikTok mendukung caption panjang
+- keduanya baca key yang sama (`openai_caption_max_hashtags`) dari `caption_ai.json`, tetapi fallback default berbeda: WF-02=3, WF-05=8
+- jika diisi di config, WF-02 dan WF-05 akan pakai nilai yang sama; pastikan nilai ini sesuai kebutuhan platform utama kamu
+
 ---
 
 ## WF-03 Publish YouTube Shorts
@@ -184,7 +190,7 @@ Upload clip yang sudah punya caption ke TikTok melalui Zernio API (draft mode).
 
 ### Config
 - `shared/config/zernio_api_key.txt` — API key Zernio (fallback: `$env.ZERNIO_API_KEY`)
-- `shared/config/wf05_manual_gdrive.json` — `zernio_tiktok_account_id` (fallback: `$env.ZERNIO_TIKTOK_ACCOUNT_ID`)
+- `shared/config/tiktok_zernio.json` — `zernio_tiktok_account_id` (fallback: `$env.ZERNIO_TIKTOK_ACCOUNT_ID`)
 
 ### Output
 - `tiktok_publish_result_clip_01.json` dst.
@@ -209,7 +215,7 @@ Pantau folder Google Drive tertentu, generate caption TikTok otomatis via OpenAI
 - Cron polling setiap 5 menit
 
 ### Flow
-1. Baca config dari `shared/config/wf05_manual_gdrive.json`
+1. Baca config dari `shared/config/tiktok_zernio.json`
 2. List semua file MP4 di folder Google Drive inbox
 3. Filter file yang belum diproses (cek state file)
 4. Generate caption TikTok via OpenAI (max 8 hashtag, lowercase)
@@ -218,7 +224,7 @@ Pantau folder Google Drive tertentu, generate caption TikTok otomatis via OpenAI
 7. Update state file (atomic write, cleanup entry >90 hari)
 
 ### Config
-- `shared/config/wf05_manual_gdrive.json`:
+- `shared/config/tiktok_zernio.json`:
   - `manual_drive_inbox_folder_id` — ID folder Google Drive yang dipantau
   - `zernio_tiktok_account_id` — ID akun TikTok di Zernio
   - `default_content_context` — konteks umum channel untuk caption AI

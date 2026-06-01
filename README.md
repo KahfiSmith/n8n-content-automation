@@ -167,12 +167,19 @@ Urutan manual yang direkomendasikan:
 2. `WF-02 Generate Caption Auto Schedule`
 3. `WF-03 Publish YouTube Shorts Auto Schedule`
 
+Workflow TikTok (opsional, lihat `docs/02-workflows.md`):
+
+4. `WF-04 Publish TikTok via Zernio` — publish clip dari pipeline `caption_result.json` ke TikTok
+5. `WF-05 Manual GDrive Inbox to TikTok Zernio Draft` — pantau folder GDrive, auto caption, draft TikTok
+
 Catatan:
 
 - `WF-01` membaca job clip di `shared/ready/`
 - `WF-02` membuat `caption_result.json` dan CSV upload queue
 - `WF-03` publish ke YouTube Shorts memakai `caption_result.json`, `manifest.json`, dan file clip
 - `WF-03` menulis result per clip seperti `youtube_publish_result_clip_01.json`
+- `WF-04` butuh config `shared/config/zernio_api_key.txt` dan `wf04_gdrive_upload_folder_id` di `shared/config/tiktok_zernio.json`
+- `WF-05` butuh config `shared/config/tiktok_zernio.json` (folder inbox + akun Zernio)
 
 Jika workflow belum muncul di n8n, import workflow dari folder:
 
@@ -186,6 +193,8 @@ Contoh import dari container:
 docker compose exec n8n n8n import:workflow --input=/files/imports/wf-01-intake-clip-validate-assets.json
 docker compose exec n8n n8n import:workflow --input=/files/imports/wf-02-generate-caption-auto-schedule.json
 docker compose exec n8n n8n import:workflow --input=/files/imports/wf-03-publish-youtube-shorts-auto-schedule.json
+docker compose exec n8n n8n import:workflow --input=/files/imports/wf-04-publish-tiktok-zernio.json
+docker compose exec n8n n8n import:workflow --input=/files/imports/wf-05-manual-gdrive-to-zernio.json
 ```
 
 ### 5. Cek hasil publish YouTube

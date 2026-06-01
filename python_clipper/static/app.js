@@ -41,7 +41,7 @@ const I18N = {
     "help.subtitle_fontsdir": "Folder berisi file .ttf/.otf buat subtitle. Default: folder project <b>fonts</b>.",
     "label.cookies": "Cookies File (opsional)",
     "ph.cookies": "youtube_cookies.txt",
-    "help.cookies": "Path ke file cookies YouTube. Export dari browser untuk hindari blokir bot.",
+    "help.cookies": "Path ke file cookies YouTube. Example: youtube_cookies.txt",
     "label.subtitle_outline": "Subtitle Outline",
     "help.subtitle_outline": "Ketebalan outline subtitle (pixel). 0 = tanpa outline.",
     "label.start": "Start (detik atau mm:ss)",
