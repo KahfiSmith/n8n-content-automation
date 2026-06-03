@@ -16,20 +16,19 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 
 
-DEFAULT_VARIANTS = [
-    "Roadmap 0-100 juta/bulan bukan soal nekat, tapi soal strategi yang bisa dipakai bertahap sesuai kondisi masing-masing.",
-    "Bagian ini ngebahas kenapa target 100 juta/bulan perlu dipecah jadi langkah yang lebih realistis dan bisa dieksekusi.",
-    "Kalau mau naik level di 2025, fokusnya bukan cuma cari peluang, tapi bikin sistem yang bisa diulang.",
-    "Strategi bisnis dan finansial bakal lebih masuk akal kalau disesuaikan dengan modal, skill, dan kondisi sekarang.",
-    "Mindset yang dibahas di sini: jangan cuma ikut tren, pahami pola mainnya dulu sebelum copy strateginya.",
-    "Target besar jadi lebih mungkin dicapai kalau rutenya jelas dan keputusan hariannya konsisten.",
+PLATFORM_HASHTAGS: dict[str, list[str]] = {}
+
+
+CLIP_POSITION_HOOKS = [
+    "Mulai dari sini.",
+    "Ini bagian yang sering dilewat.",
+    "Simpan bagian ini.",
+    "Yang ini krusial.",
+    "Perhatikan baik-baik.",
+    "Ini yang bikin beda.",
+    "Sini rahasianya.",
+    "Ini penutup yang ngena.",
 ]
-
-
-PLATFORM_HASHTAGS = {
-    "youtube_shorts": ["#YoutubeShorts", "#StrategiBisnis", "#Finansial", "#MotivasiBisnis"],
-    "facebook_reels": ["#FacebookReels", "#StrategiBisnis", "#Finansial", "#MotivasiBisnis"],
-}
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -112,11 +111,49 @@ def platform_hashtags(platform: str, base_hashtags: list[str]) -> list[str]:
     return dedupe(base_hashtags or PLATFORM_HASHTAGS.get(platform, []), limit=8)
 
 
-def caption_for_clip(index: int, platform: str, base_caption: str) -> str:
-    variant = DEFAULT_VARIANTS[(index - 1) % len(DEFAULT_VARIANTS)]
+def caption_for_clip(
+    index: int,
+    platform: str,
+    base_caption: str,
+    total_clips: int,
+    transcript_segment: str = "",
+) -> str:
+    if not base_caption:
+        return ""
+
+    if total_clips <= 1:
+        return base_caption
+
+    sentences = [s.strip() for s in base_caption.replace("!", ".").replace("?", ".").split(".") if s.strip()]
+    if not sentences:
+        sentences = [base_caption]
+
+    if transcript_segment:
+        seg_sentences = [s.strip() for s in transcript_segment.replace("!", ".").replace("?", ".").split(".") if s.strip()]
+        seg_sentences = [s for s in seg_sentences if len(s) > 10][:2]
+        if seg_sentences:
+            hook = CLIP_POSITION_HOOKS[(index - 1) % len(CLIP_POSITION_HOOKS)]
+            caption = f"{hook} {'. '.join(seg_sentences)}."
+            if platform == "facebook_reels":
+                caption = caption.replace("ngebahas", "membahas")
+            return caption.strip()
+
+    total = len(sentences)
+    if total == 1:
+        chunk = sentences
+    else:
+        chunk_size = max(1, total // total_clips)
+        start = (index - 1) * chunk_size
+        end = start + chunk_size if index < total_clips else total
+        chunk = sentences[start:end]
+        if not chunk:
+            chunk = [sentences[-1]]
+
+    hook = CLIP_POSITION_HOOKS[(index - 1) % len(CLIP_POSITION_HOOKS)]
+    caption = f"{hook} {'. '.join(chunk)}."
     if platform == "facebook_reels":
-        return variant.replace("ngebahas", "membahas")
-    return base_caption or variant
+        caption = caption.replace("ngebahas", "membahas")
+    return caption.strip()
 
 
 def update_caption_result(
@@ -134,14 +171,36 @@ def update_caption_result(
                 base_caption = str(item["caption"]).strip()
                 break
 
+    transcript_segments: dict[int, str] = {}
+    clip_caption_pack_existing = caption_result.get("clip_caption_pack")
+    if isinstance(clip_caption_pack_existing, list):
+        for item in clip_caption_pack_existing:
+            if not isinstance(item, dict):
+                continue
+            idx = item.get("clip_index")
+            transcript = str(item.get("transcript_text") or item.get("transcript") or "").strip()
+            if idx and transcript:
+                transcript_segments[int(idx)] = transcript
+
+    transcript_text = str(caption_result.get("transcript_text") or manifest.get("transcript_text") or "").strip()
+    if transcript_text and not transcript_segments:
+        segment_len = max(100, len(transcript_text) // max(1, len(clips)))
+        for i, clip in enumerate(clips):
+            start = i * segment_len
+            end = start + segment_len + 50
+            transcript_segments[clip["clip_index"]] = transcript_text[start:end]
+
+    total_clips = len(clips)
     clip_caption_pack = []
     for clip in clips:
+        clip_idx = int(clip["clip_index"])
+        segment = transcript_segments.get(clip_idx, "")
         captions = []
         for platform in platforms:
             captions.append(
                 {
                     "platform": platform,
-                    "caption": caption_for_clip(int(clip["clip_index"]), platform, base_caption),
+                    "caption": caption_for_clip(clip_idx, platform, base_caption, total_clips, segment),
                     "hashtags": platform_hashtags(platform, base_hashtags),
                 }
             )
