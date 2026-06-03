@@ -1,0 +1,8 @@
+{
+  "descriptions": {
+    "clip_1.mp4": "",
+    "clip_2.mp4": "",
+    "clip_3.mp4": ""
+  },
+  "_instructions": "Isi deskripsi per video di sini. Key = nama file video, value = deskripsi singkat isi konten. Contoh: 'clip_1.mp4': 'Tips hemat belanja bulanan untuk mahasiswa semester akhir'"
+}

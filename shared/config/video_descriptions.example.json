@@ -1,0 +1,8 @@
+{
+  "descriptions": {
+    "contoh_tips_bisnis.mp4": "5 tips memulai bisnis modal kecil untuk mahasiswa, bahas soal riset pasar, manajemen waktu, dan strategi pricing dasar",
+    "contoh_review_produk.mp4": "Review jujur skincare viral yang lagi hype di TikTok, sebelum dan sesudah pakai selama 2 minggu",
+    "contoh_motivasi.mp4": "Motivasi pagi tentang pentingnya konsistensi dalam membangun kebiasaan baik, contoh dari pengalaman pribadi"
+  },
+  "_cara_pakai": "Key = nama file video persis seperti di GDrive. Value = deskripsi singkat isi konten. Kosongkan value ('') jika belum tahu isi video."
+}

@@ -2,5 +2,5 @@
   "manual_drive_inbox_folder_id": "ISI_DENGAN_FOLDER_ID_GDRIVE_INBOX_WF05",
   "zernio_tiktok_account_id": "ISI_DENGAN_ZERNIO_TIKTOK_ACCOUNT_ID",
   "wf04_gdrive_upload_folder_id": "ISI_DENGAN_FOLDER_ID_GDRIVE_UNTUK_UPLOAD_WF04",
-  "default_content_context": "Isi konteks umum channel atau niche agar caption tetap relevan saat nama file kurang detail."
+  "default_content_context": "isi dengan konteks niche channel, misal: motivasi bisnis untuk anak muda, tips produktivitas, dll. Kosongkan jika ingin pakai video_description per file (.txt companion)."
 }
