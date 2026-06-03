@@ -12,7 +12,7 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 5
+              "minutesInterval": 30
             }
           ]
         }
@@ -23,7 +23,7 @@
       "typeVersion": 1.2,
       "position": [
         -1280,
-        160
+        0
       ]
     },
     {
@@ -35,8 +35,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1060,
-        160
+        -1040,
+        0
       ]
     },
     {
@@ -69,8 +69,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -840,
-        160
+        -800,
+        0
       ]
     },
     {
@@ -114,8 +114,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -620,
-        80
+        -560,
+        0
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -126,15 +126,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst config = $('Load WF05 Config').first().json;\nconst statePath = '/files/state/wf05_manual_gdrive_processed.json';\nlet state = { processed: {} };\n\nif (fs.existsSync(statePath)) {\n  try {\n    state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n  } catch (error) {\n    throw new Error('State WF-05 rusak: ' + error.message);\n  }\n}\nif (!state.processed || typeof state.processed !== 'object') state.processed = {};\n\nconst files = Array.isArray($json.files) ? $json.files : [];\nconst output = [];\nfor (const file of files) {\n  const previous = state.processed[file.id];\n  if (previous && previous.status === 'TIKTOK_DRAFT_CREATED') continue;\n  if (String(file.mimeType || '').toLowerCase() !== 'video/mp4') continue;\n\n  output.push({\n    json: {\n      ...config,\n      gdrive_file_id: file.id,\n      gdrive_file_name: file.name || '',\n      gdrive_mime_type: file.mimeType || '',\n      gdrive_description: file.description || '',\n      gdrive_created_time: file.createdTime || '',\n      gdrive_web_view_link: file.webViewLink || '',\n      gdrive_size: file.size || '',\n      state_path: statePath,\n    }\n  });\n}\n\nif (output.length === 0) {\n  return [{ json: { status: 'NOTHING_TO_UPLOAD' } }];\n}\nreturn output;"
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst config = $('Load WF05 Config').first().json;\nconst statePath = '/files/state/wf05_manual_gdrive_processed.json';\nlet state = { processed: {} };\n\nif (fs.existsSync(statePath)) {\n  try {\n    state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n  } catch (error) {\n    throw new Error('State WF-05 rusak: ' + error.message);\n  }\n}\nif (!state.processed || typeof state.processed !== 'object') state.processed = {};\n\n// Clean up stale in_progress entries older than 30 minutes\nconst staleCutoff = Date.now() - (30 * 60 * 1000);\nfor (const [key, val] of Object.entries(state.processed)) {\n  if (val.status === 'IN_PROGRESS' && val.picked_at) {\n    const ts = Date.parse(val.picked_at);\n    if (Number.isFinite(ts) && ts < staleCutoff) {\n      delete state.processed[key];\n    }\n  }\n}\n\nconst files = Array.isArray($json.files) ? $json.files : [];\nconst output = [];\nconst pickedAt = new Date().toISOString();\nconst tempState = { ...state };\n\nfor (const file of files) {\n  const previous = tempState.processed[file.id];\n  // Skip if already completed or currently being processed\n  if (previous && (previous.status === 'TIKTOK_DRAFT_CREATED' || previous.status === 'IN_PROGRESS')) {\n    continue;\n  }\n  if (String(file.mimeType || '').toLowerCase() !== 'video/mp4') continue;\n\n  // Mark as in_progress immediately to prevent concurrent runs from picking it up\n  tempState.processed[file.id] = {\n    status: 'IN_PROGRESS',\n    picked_at: pickedAt,\n    gdrive_file_id: file.id,\n    gdrive_file_name: file.name || '',\n  };\n\n  output.push({\n    json: {\n      ...config,\n      gdrive_file_id: file.id,\n      gdrive_file_name: file.name || '',\n      gdrive_mime_type: file.mimeType || '',\n      gdrive_description: file.description || '',\n      gdrive_created_time: file.createdTime || '',\n      gdrive_web_view_link: file.webViewLink || '',\n      gdrive_size: file.size || '',\n      state_path: statePath,\n    }\n  });\n}\n\n// Write updated state file with in_progress markers\nif (output.length > 0) {\n  const tmpPath = statePath + '.tmp.' + process.pid;\n  fs.writeFileSync(tmpPath, JSON.stringify(tempState, null, 2) + '\\n', 'utf8');\n  fs.renameSync(tmpPath, statePath);\n}\n\nif (output.length === 0) {\n  return [{ json: { status: 'NOTHING_TO_UPLOAD' } }];\n}\nreturn output;"
       },
       "id": "d5000001-0001-4000-8000-000000000006",
       "name": "Build Pending Manual Videos",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -400,
-        80
+        -320,
+        0
       ]
     },
     {
@@ -167,21 +167,21 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -180,
-        80
+        -80,
+        0
       ]
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const apiKey = String($json.openai_api_key || '').trim();\nconst model = String($json.openai_caption_model || 'gpt-5.4-mini');\nconst language = String($json.openai_caption_language || 'id');\nconst brandVoice = String($json.openai_caption_brand_voice || 'ringkas, tajam, natural, tidak clickbait murahan');\nconst maxHashtags = Number.isFinite($json.openai_caption_max_hashtags) ? $json.openai_caption_max_hashtags : 8;\n\nfunction failure(message) {\n  return { json: { ...$json, caption_generation_status: 'failed', caption_error: message } };\n}\nif (!apiKey) return failure('OpenAI API key belum tersedia di /files/config/caption_ai.json atau OPENAI_API_KEY.');\n\nconst schema = {\n  type: 'object',\n  additionalProperties: false,\n  properties: {\n    content_angle: { type: 'string' },\n    caption: { type: 'string' },\n    hashtags: { type: 'array', items: { type: 'string' } }\n  },\n  required: ['content_angle', 'caption', 'hashtags']\n};\nconst context = {\n  language,\n  brand_voice: brandVoice,\n  max_hashtags: maxHashtags,\n  platform: 'tiktok',\n  file_name: $json.gdrive_file_name,\n  drive_description: $json.gdrive_description || null,\n  default_content_context: $json.default_content_context || null,\n};\nconst body = {\n  model,\n  store: false,\n  input: [\n    {\n      role: 'system',\n      content: [{ type: 'input_text', text: 'Anda adalah copywriter TikTok. Balas hanya JSON valid sesuai schema. Buat caption dan hashtag yang natural berdasarkan metadata yang tersedia. Jangan mengarang fakta spesifik jika metadata kurang jelas. Jangan menambahkan label seperti Caption: atau Hashtag:.' }]\n    },\n    { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(context, null, 2) }] }\n  ],\n  text: { format: { type: 'json_schema', name: 'manual_drive_tiktok_caption', strict: true, schema } }\n};\n\ntry {\n  const data = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/responses',\n    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },\n    body,\n    json: true,\n  });\n  let parsed = data.output_parsed || null;\n  let outputText = data.output_text || '';\n  if (!parsed && !outputText && Array.isArray(data.output)) {\n    for (const item of data.output) {\n      for (const part of item.content || []) {\n        if (typeof part.text === 'string' && part.text.trim()) outputText = part.text;\n      }\n    }\n  }\n  if (!parsed) parsed = JSON.parse(outputText);\n  const hashtags = (Array.isArray(parsed.hashtags) ? parsed.hashtags : [])\n    .map((tag) => String(tag || '').trim())\n    .filter(Boolean)\n    .map((tag) => tag.startsWith('#') ? tag : '#' + tag)\n    .map((tag) => tag.toLowerCase())\n    .slice(0, maxHashtags);\n  const caption = String(parsed.caption || '').trim();\n  return {\n    json: {\n      ...$json,\n      caption_generation_status: 'generated',\n      caption_model: model,\n      content_angle: String(parsed.content_angle || '').trim(),\n      caption,\n      hashtags,\n      caption_full: [caption, hashtags.join(' ')].filter(Boolean).join(' ').trim(),\n    }\n  };\n} catch (error) {\n  return failure(error.message || 'Gagal membuat caption melalui OpenAI.');\n}"
+        "jsCode": "const apiKey = String($json.openai_api_key || '').trim();\nconst model = String($json.openai_caption_model || 'gpt-5.4-mini');\nconst language = String($json.openai_caption_language || 'id');\nconst brandVoice = String($json.openai_caption_brand_voice || 'ringkas, tajam, natural, tidak clickbait murahan');\nconst maxHashtags = Number.isFinite($json.openai_caption_max_hashtags) ? $json.openai_caption_max_hashtags : 8;\n\nfunction failure(message) {\n  return { json: { ...$json, caption_generation_status: 'failed', caption_error: message } };\n}\nif (!apiKey) return failure('OpenAI API key belum tersedia di /files/config/caption_ai.json atau OPENAI_API_KEY.');\n\nconst schema = {\n  type: 'object',\n  additionalProperties: false,\n  properties: {\n    content_angle: { type: 'string' },\n    caption: { type: 'string' },\n    hashtags: { type: 'array', items: { type: 'string' } }\n  },\n  required: ['content_angle', 'caption', 'hashtags']\n};\n\nconst transcriptText = String($json.transcript_text || '').trim();\nconst transcriptAvailable = transcriptText.length > 0;\nconst fileName = String($json.gdrive_file_name || '').trim();\nconst contentContext = String($json.default_content_context || '').trim();\n\nconst context = {\n  language,\n  brand_voice: brandVoice,\n  max_hashtags: maxHashtags,\n  platform: 'tiktok',\n  file_name: fileName,\n  transcript_available: transcriptAvailable,\n  transcript_text: transcriptAvailable ? transcriptText.slice(0, 6000) : null,\n  content_context: contentContext || null,\n};\n\nconst systemPrompt = 'Anda adalah copywriter TikTok yang kreatif dan spesifik. Balas hanya JSON valid sesuai schema. SUMBER KONTEN UTAMA: Gunakan transcript_text untuk memahami isi video dan buat caption yang spesifik membahas topik di transcript. Jika transcript tersedia, caption WAJIB relevan dengan isi transcript, bukan umum. Jika transcript TIDAK tersedia, gunakan content_context atau file_name sebagai referensi, dan buat caption yang jujur serta mengajak audience menonton. JANGAN PERNAH buat caption generik seperti \"Kadang yang simpel justru paling kena\", \"Simple, padat, langsung ke inti\", atau \"Simpan kalau relate\" karena itu tidak spesifik dan membosankan. Caption harus membuat orang penasaran atau merasa langsung terhubung dengan topik spesifik dari video. content_angle harus berisi ringkasan pendek tentang sudut pandang konten, BUKAN parafrase caption. PENTING UNTUK VARIASI: Caption HARUS unik. Gunakan berbagai gaya: pertanyaan pembuka, pernyataan tegas, storytelling singkat, fakta mengejutkan, atau opini berani. Variasikan panjang dan ritme caption. UNTUK HASHTAG: JANGAN pernah pakai hashtag generik seperti #fyp, #foryou, #foryoupage, #tiktok, #viral, #tiktokindonesia, #tiktokviral, #fypシ, #xyzbca. Hashtag WAJIB spesifik dari isi konten/transcript. Jika tidak ada konteks cukup, gunakan hashtag minimal yang relevan.';\n\nconst body = {\n  model,\n  store: false,\n  input: [\n    {\n      role: 'system',\n      content: [{ type: 'input_text', text: systemPrompt }]\n    },\n    { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(context, null, 2) }] }\n  ],\n  temperature: 0.85,\n  text: { format: { type: 'json_schema', name: 'manual_drive_tiktok_caption', strict: true, schema } }\n};\n\ntry {\n  const data = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/responses',\n    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },\n    body,\n    json: true,\n  });\n  let parsed = data.output_parsed || null;\n  let outputText = data.output_text || '';\n  if (!parsed && !outputText && Array.isArray(data.output)) {\n    for (const item of data.output) {\n      for (const part of item.content || []) {\n        if (typeof part.text === 'string' && part.text.trim()) outputText = part.text;\n      }\n    }\n  }\n  if (!parsed) parsed = JSON.parse(outputText);\n  const hashtags = (Array.isArray(parsed.hashtags) ? parsed.hashtags : [])\n    .map((tag) => String(tag || '').trim())\n    .filter(Boolean)\n    .map((tag) => tag.startsWith('#') ? tag : '#' + tag)\n    .map((tag) => tag.toLowerCase())\n    .slice(0, maxHashtags);\n  const caption = String(parsed.caption || '').trim();\n  return {\n    json: {\n      ...$json,\n      caption_generation_status: 'generated',\n      caption_model: model,\n      content_angle: String(parsed.content_angle || '').trim(),\n      caption,\n      hashtags,\n      caption_full: [caption, hashtags.join(' ')].filter(Boolean).join(' ').trim(),\n    }\n  };\n} catch (error) {\n  return failure(error.message || 'Gagal membuat caption melalui OpenAI.');\n}"
       },
       "id": "d5000001-0001-4000-8000-000000000009",
       "name": "Generate TikTok Caption",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        40,
+        880,
         0
       ]
     },
@@ -214,7 +214,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        260,
+        1120,
         0
       ]
     },
@@ -235,8 +235,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        480,
-        -80
+        1360,
+        -180
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -247,15 +247,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst captionItems = $('Generate TikTok Caption').all();\nconst output = [];\nconst apiKey = fs.readFileSync('/files/config/zernio_api_key.txt', 'utf8').trim();\n\nfor (const item of captionItems) {\n  const original = item.json;\n  if (original.caption_generation_status !== 'generated') continue;\n  const fileId = String(original.gdrive_file_id || '').trim();\n  const accountId = String(original.zernio_tiktok_account_id || '').trim();\n  if (!fileId) throw new Error('Google Drive file ID kosong.');\n  if (!accountId) throw new Error('zernio_tiktok_account_id belum diisi di config WF-05.');\n  const videoUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://zernio.com/api/v1/posts',\n    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },\n    body: {\n      content: original.caption_full || '',\n      mediaItems: [{ url: videoUrl, type: 'video' }],\n      platforms: [{ platform: 'tiktok', accountId }],\n    },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n  });\n  const statusCode = response.statusCode || 0;\n  const success = statusCode >= 200 && statusCode < 300;\n  const result = {\n    status: success ? 'TIKTOK_DRAFT_CREATED' : 'TIKTOK_PUBLISH_FAILED',\n    processed_at: new Date().toISOString(),\n    gdrive_file_id: fileId,\n    gdrive_file_name: original.gdrive_file_name,\n    gdrive_mime_type: original.gdrive_mime_type,\n    video_url: videoUrl,\n    content_angle: original.content_angle,\n    caption: original.caption,\n    hashtags: original.hashtags,\n    caption_full: original.caption_full,\n    zernio_status: statusCode,\n    zernio_response: response.body,\n  };\n\n  if (success) {\n    const statePath = original.state_path || '/files/state/wf05_manual_gdrive_processed.json';\n    fs.mkdirSync(path.dirname(statePath), { recursive: true });\n    let state = { processed: {} };\n    if (fs.existsSync(statePath)) state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n    if (!state.processed || typeof state.processed !== 'object') state.processed = {};\n    state.processed[fileId] = result;\n    const cutoff = Date.now() - (90 * 24 * 60 * 60 * 1000);\n    for (const [key, val] of Object.entries(state.processed)) {\n      const ts = Date.parse(val.processed_at || '');\n      if (Number.isFinite(ts) && ts < cutoff) delete state.processed[key];\n    }\n    const tmpPath = statePath + '.tmp.' + process.pid;\n    fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\\n', 'utf8');\n    fs.renameSync(tmpPath, statePath);\n  }\n  output.push({ json: result });\n}\nreturn output;"
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst captionItems = $('Generate TikTok Caption').all();\nconst output = [];\nconst apiKey = fs.readFileSync('/files/config/zernio_api_key.txt', 'utf8').trim();\n\nfor (const item of captionItems) {\n  const original = item.json;\n  if (original.caption_generation_status !== 'generated') continue;\n  const fileId = String(original.gdrive_file_id || '').trim();\n  const accountId = String(original.zernio_tiktok_account_id || '').trim();\n  if (!fileId) throw new Error('Google Drive file ID kosong.');\n  if (!accountId) throw new Error('zernio_tiktok_account_id belum diisi di config WF-05.');\n  const videoUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://zernio.com/api/v1/posts',\n    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },\n    body: {\n      content: original.caption_full || '',\n      mediaItems: [{ url: videoUrl, type: 'video' }],\n      platforms: [{ platform: 'tiktok', accountId }],\n    },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n  });\n  const statusCode = response.statusCode || 0;\n  const success = statusCode >= 200 && statusCode < 300;\n  const result = {\n    status: success ? 'TIKTOK_DRAFT_CREATED' : 'TIKTOK_PUBLISH_FAILED',\n    processed_at: new Date().toISOString(),\n    gdrive_file_id: fileId,\n    gdrive_file_name: original.gdrive_file_name,\n    gdrive_mime_type: original.gdrive_mime_type,\n    video_url: videoUrl,\n    content_angle: original.content_angle,\n    caption: original.caption,\n    hashtags: original.hashtags,\n    caption_full: original.caption_full,\n    zernio_status: statusCode,\n    zernio_response: response.body,\n  };\n\n  if (success) {\n    const statePath = original.state_path || '/files/state/wf05_manual_gdrive_processed.json';\n    fs.mkdirSync(path.dirname(statePath), { recursive: true });\n    let state = { processed: {} };\n    if (fs.existsSync(statePath)) state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n    if (!state.processed || typeof state.processed !== 'object') state.processed = {};\n    state.processed[fileId] = result;\n    const cutoff = Date.now() - (90 * 24 * 60 * 60 * 1000);\n    for (const [key, val] of Object.entries(state.processed)) {\n      if (val.status === 'TIKTOK_DRAFT_CREATED') {\n        const ts = Date.parse(val.processed_at || '');\n        if (Number.isFinite(ts) && ts < cutoff) delete state.processed[key];\n      }\n    }\n    const tmpPath = statePath + '.tmp.' + process.pid;\n    fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\\n', 'utf8');\n    fs.renameSync(tmpPath, statePath);\n  }\n  output.push({ json: result });\n}\nreturn output;"
       },
       "id": "d5000001-0001-4000-8000-000000000013",
       "name": "Create Zernio TikTok Draft",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        -80
+        1600,
+        -180
       ]
     },
     {
@@ -267,21 +267,55 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -620,
-        260
+        -560,
+        220
       ]
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => ({\n  json: {\n    status: 'CAPTION_FAILED',\n    gdrive_file_id: item.json.gdrive_file_id,\n    gdrive_file_name: item.json.gdrive_file_name,\n    error: item.json.caption_error || 'Caption gagal dibuat.',\n  }\n}));"
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const d = item.json;\n  const fileId = String(d.gdrive_file_id || '').trim();\n  const statePath = d.state_path || '/files/state/wf05_manual_gdrive_processed.json';\n\n  if (fileId) {\n    try {\n      let state = { processed: {} };\n      if (fs.existsSync(statePath)) state = JSON.parse(fs.readFileSync(statePath, 'utf8'));\n      if (state.processed && state.processed[fileId] && state.processed[fileId].status === 'IN_PROGRESS') {\n        delete state.processed[fileId];\n        const tmpPath = statePath + '.tmp.' + process.pid;\n        fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\\n', 'utf8');\n        fs.renameSync(tmpPath, statePath);\n      }\n    } catch (e) {}\n  }\n\n  output.push({\n    json: {\n      status: 'CAPTION_FAILED',\n      gdrive_file_id: fileId,\n      gdrive_file_name: d.gdrive_file_name,\n      error: d.caption_error || 'Caption gagal dibuat.',\n    }\n  });\n}\nreturn output;"
       },
       "id": "d5000001-0001-4000-8000-000000000015",
       "name": "Report Caption Failure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        480,
-        120
+        1360,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": "={{ $json.gdrive_file_id }}",
+        "options": {}
+      },
+      "id": "d5000001-0001-4000-8000-000000000030",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "rpITMqiGoYnbvAVf",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const apiKey = String($json.openai_api_key || '').trim();\nif (!apiKey) {\n  return [{ json: { ...$json, transcript_text: '', transcript_available: false, transcript_error: 'OpenAI API key tidak tersedia.' } }];\n}\n\nconst items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const binaryData = item.binary?.data;\n  if (!binaryData) {\n    output.push({ json: { ...item.json, transcript_text: '', transcript_available: false, transcript_error: 'Binary video tidak ditemukan.' } });\n    continue;\n  }\n\n  try {\n    const buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\n    const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);\n    const fileName = item.json.gdrive_file_name || 'video.mp4';\n\n    const formParts = [];\n    formParts.push(\n      '--' + boundary + '\\r\\n' +\n      'Content-Disposition: form-data; name=\"file\"; filename=\"' + fileName + '\"\\r\\n' +\n      'Content-Type: video/mp4\\r\\n\\r\\n'\n    );\n    formParts.push(buffer);\n    formParts.push(\n      '\\r\\n--' + boundary + '\\r\\n' +\n      'Content-Disposition: form-data; name=\"model\"\\r\\n\\r\\n' +\n      'whisper-1'\n    );\n    formParts.push(\n      '\\r\\n--' + boundary + '\\r\\n' +\n      'Content-Disposition: form-data; name=\"language\"\\r\\n\\r\\n' +\n      'id'\n    );\n    formParts.push(\n      '\\r\\n--' + boundary + '\\r\\n' +\n      'Content-Disposition: form-data; name=\"response_format\"\\r\\n\\r\\n' +\n      'text'\n    );\n    formParts.push('\\r\\n--' + boundary + '--\\r\\n');\n\n    const body = Buffer.concat(formParts.map(p => typeof p === 'string' ? Buffer.from(p) : p));\n\n    const response = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.openai.com/v1/audio/transcriptions',\n      headers: {\n        'Authorization': 'Bearer ' + apiKey,\n        'Content-Type': 'multipart/form-data; boundary=' + boundary,\n      },\n      body,\n      returnFullResponse: true,\n      ignoreHttpStatusErrors: true,\n    });\n\n    const statusCode = response.statusCode || 0;\n    const responseBody = typeof response.body === 'string' ? response.body : JSON.stringify(response.body || '');\n\n    if (statusCode >= 200 && statusCode < 300) {\n      const transcriptText = responseBody.trim();\n      output.push({\n        json: {\n          ...item.json,\n          transcript_text: transcriptText,\n          transcript_available: transcriptText.length > 0,\n          transcript_error: null,\n        }\n      });\n    } else {\n      output.push({\n        json: {\n          ...item.json,\n          transcript_text: '',\n          transcript_available: false,\n          transcript_error: 'Whisper API error ' + statusCode + ': ' + responseBody.slice(0, 300),\n        }\n      });\n    }\n  } catch (error) {\n    output.push({\n      json: {\n        ...item.json,\n        transcript_text: '',\n        transcript_available: false,\n        transcript_error: 'Transcription failed: ' + (error.message || 'unknown error'),\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "id": "d5000001-0001-4000-8000-000000000031",
+      "name": "Transcribe with Whisper",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
       ]
     }
   ],
@@ -352,7 +386,7 @@
       "main": [
         [
           {
-            "node": "Generate TikTok Caption",
+            "node": "Download Video",
             "type": "main",
             "index": 0
           }
@@ -394,6 +428,28 @@
         [
           {
             "node": "Create Zernio TikTok Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Transcribe with Whisper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe with Whisper": {
+      "main": [
+        [
+          {
+            "node": "Generate TikTok Caption",
             "type": "main",
             "index": 0
           }
